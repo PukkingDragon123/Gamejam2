@@ -291,3 +291,75 @@ body{
   .bar{ width:64px; }
   .card{ flex-basis:64px; width:64px; }
 }
+
+/* =========================================================
+   v2 additions — dev-software theme, packs, drinks, tutorial
+   ========================================================= */
+.hud-item.clock .hud-val{ color:var(--good); }
+.hud-item.clock.danger .hud-val{ color:var(--bad); animation:pulse .5s steps(2) infinite; }
+@keyframes pulse{ 50%{ opacity:.35; } }
+
+.bar.big{ width:100%; height:16px; margin:12px 0; }
+
+/* tray header */
+.tray-head{
+  position:absolute; margin-top:-20px; font-size:10px; color:var(--ink-dim);
+}
+#tray{ position:relative; }
+
+/* pack opening */
+.pack-modal .pack-cv{ image-rendering:pixelated; margin:8px auto; display:block; filter:drop-shadow(0 6px 0 rgba(0,0,0,.4)); transition:transform .1s; }
+.pack-modal .pack-cv:hover{ transform:scale(1.06) rotate(-2deg); }
+.pack-cards{ display:flex; gap:14px; justify-content:center; flex-wrap:wrap; margin-top:14px; }
+.pcard{
+  width:110px; background:var(--panel-2); border:3px solid var(--line);
+  padding:10px 8px; cursor:pointer; text-align:center; transition:transform .1s;
+}
+.pcard.flip{ animation:flipin .4s ease-out both; }
+@keyframes flipin{ from{ transform:rotateY(90deg); opacity:0; } to{ transform:rotateY(0); opacity:1; } }
+.pcard:hover{ transform:translateY(-8px) scale(1.03); }
+.pcard canvas{ image-rendering:pixelated; width:64px; height:64px; }
+.pcard .pc-name{ font-size:11px; margin:4px 0 2px; }
+.pcard .pc-stat{ font-size:10px; color:var(--good); }
+.pcard .pc-rar{ font-size:9px; margin-top:5px; letter-spacing:.1em; }
+.pcard.rar-common{ border-color:#6a7086; } .pcard.rar-common .pc-rar{ color:#9aa7c7; }
+.pcard.rar-uncommon{ border-color:#5df0c0; box-shadow:0 0 0 1px #5df0c055; } .pcard.rar-uncommon .pc-rar{ color:#5df0c0; }
+.pcard.rar-rare{ border-color:#ffd24d; box-shadow:0 0 12px #ffd24d55; } .pcard.rar-rare .pc-rar{ color:#ffd24d; }
+
+/* install */
+.inst-log{
+  text-align:left; font-family:"Courier New",monospace; font-size:11px; color:#8ee6a0;
+  background:#0b0913; border:2px solid var(--line); padding:8px; margin-top:10px;
+  min-height:96px; white-space:pre-wrap; line-height:1.5;
+}
+
+/* drinks */
+.drinks-modal .drinks-row{ display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:14px; }
+.drink{
+  width:104px; background:var(--panel-2); border:3px solid var(--line);
+  padding:10px 6px; cursor:pointer; text-align:center; transition:transform .1s;
+}
+.drink:hover{ transform:translateY(-6px); border-color:var(--accent); }
+.drink canvas{ image-rendering:pixelated; }
+.drink .d-name{ font-size:11px; color:var(--accent); margin:4px 0 3px; line-height:1.2; }
+.drink .d-energy{ font-size:12px; color:var(--time); }
+.drink .d-debuff{ font-size:10px; color:var(--energy); margin-top:5px; }
+
+/* tutorial callout */
+#tutorial{
+  position:absolute; left:50%; bottom:12px; transform:translateX(-50%);
+  z-index:60; max-width:90%;
+}
+.tut-box{
+  display:flex; align-items:center; gap:10px;
+  background:rgba(20,16,32,.96); border:2px solid var(--accent);
+  padding:8px 12px; font-size:12px; line-height:1.5; color:var(--ink);
+  box-shadow:var(--shadow);
+}
+.tut-box button{
+  flex:0 0 auto; font-family:inherit; font-weight:700; font-size:11px;
+  background:var(--accent); color:#2a1500; border:0; padding:5px 10px; cursor:pointer;
+}
+
+/* loading */
+#loading .modal{ border-color:var(--good); }

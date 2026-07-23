@@ -65,7 +65,12 @@
     passout: function () { tone(300, 0.5, "sawtooth", 0, 0.18); tone(150, 0.6, "sawtooth", 0.1, 0.16); },
     sip:     function () { tone(200, 0.1, "sine", 0, 0.14); tone(380, 0.14, "sine", 0.08, 0.12); },
     win:     function () { arp([523, 659, 784, 1047, 1319], 0.11, "square", 0.16); },
-    lose:    function () { arp([392, 349, 294, 233], 0.14, "sawtooth", 0.16); }
+    lose:    function () { arp([392, 349, 294, 233], 0.14, "sawtooth", 0.16); },
+    packOpen:function () { tone(180, 0.12, "sawtooth", 0, 0.14); arp([600, 900, 1200], 0.05, "triangle", 0.13); },
+    install: function () { tone(440, 0.06, "square", 0, 0.06); },
+    point:   function () { tone(880, 0.05, "triangle", 0, 0.12); tone(1320, 0.05, "triangle", 0.02, 0.08); },
+    timerLow:function () { tone(1000, 0.05, "square", 0, 0.14); },
+    submit:  function () { arp([392, 523, 659], 0.06, "square", 0.14); }
   };
 
   var Audio = {
