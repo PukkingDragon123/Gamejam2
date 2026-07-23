@@ -1,0 +1,60 @@
+<!--
+  GAME JAM SIMULATOR
+  A silly 2D pixel-art simulator about surviving a game jam by
+  connecting gears (game mechanics), applying art styles, and
+  drinking questionable energy drinks.
+
+  No build step. No external assets. Just open this file in a browser.
+-->
+<div id="app">
+
+  <!-- ===== Top HUD bar ===== -->
+  <header id="hud" class="hidden">
+    <div class="hud-item"><span class="hud-label">DAY</span><span id="hud-day" class="hud-val">1</span></div>
+    <div class="hud-item"><span class="hud-label">GOAL</span><span id="hud-goal" class="hud-val">18</span></div>
+    <div class="hud-item time"><span class="hud-label">⏱ TIME</span>
+      <div class="bar"><div id="bar-time" class="bar-fill time-fill"></div></div>
+      <span id="hud-time" class="hud-val">12</span>
+    </div>
+    <div class="hud-item energy"><span class="hud-label">⚡ ENERGY</span>
+      <div class="bar"><div id="bar-energy" class="bar-fill energy-fill"></div></div>
+      <span id="hud-energy" class="hud-val">24</span>
+    </div>
+    <div class="hud-item hype"><span class="hud-label">🔥 HYPE</span><span id="hud-hype" class="hud-val big">0</span></div>
+    <button id="btn-mute" class="mini-btn" title="Mute / unmute sound">🔊</button>
+  </header>
+
+  <!-- ===== Main stage (canvas) ===== -->
+  <main id="stage">
+    <canvas id="game" width="512" height="288"></canvas>
+
+    <!-- Floating tooltip for gear / card info -->
+    <div id="tooltip" class="hidden"></div>
+
+    <!-- Debuff / status banner -->
+    <div id="statusbar" class="hidden"></div>
+  </main>
+
+  <!-- ===== Bottom tray: your hand of cards + action buttons ===== -->
+  <footer id="tray" class="hidden">
+    <div id="hand" class="hand"></div>
+    <div id="actions">
+      <div id="scoreline" class="scoreline">
+        <span id="chips-out">0</span> <span class="times">×</span> <span id="mult-out">1</span>
+      </div>
+      <button id="btn-run" class="big-btn">🚀 SHIP IT!</button>
+    </div>
+  </footer>
+
+  <!-- ===== Full-screen modal overlay (title / results / fridge / win / lose) ===== -->
+  <div id="overlay" class="overlay"></div>
+
+  <!-- Drag/selection ghost element -->
+  <div id="ghost" class="hidden"></div>
+</div>
+
+<link rel="stylesheet" href="css/style.css">
+<script src="js/audio.js"></script>
+<script src="js/data.js"></script>
+<script src="js/render.js"></script>
+<script src="js/game.js"></script>
