@@ -370,6 +370,7 @@
     G.board[r][c] = { gid: id, graphic: null, angle: Math.random() * 6.28, blink: false };
     G.energy = Math.max(0, G.energy - cost);
     G.dayGears[id]--; G.cursor = null;
+    G.board[r][c].pop = 1;
     G.log.push("> wired " + gd.name + " → CORE  (-" + cost + "⚡)");
     A.sfx.place(); computeScore(); updateHUD(); tut("placed");
     if (over) passout();
@@ -381,6 +382,7 @@
     G.board[r][c].graphic = id;
     G.energy = Math.max(0, G.energy - gr.energy);
     G.dayGraphics[id]--; G.cursor = null;
+    G.board[r][c].pop = 1;
     G.log.push("> painted " + gr.name + "  (-" + gr.energy + "⚡)");
     A.sfx.apply(); computeScore(); updateHUD();
     if (over) passout();
@@ -408,27 +410,48 @@
         if (G.board[nr][nc].gid) { connected.add(k); stack.push([nc, nr]); }
       }
     }
-    var n = connected.size, chips = 0, mult = 1, xmults = [];
+    // ---- build trait context (families, art counts) ----
+    var x = { n: 0, fam: {}, artCount: 0, maxArt: 0 };
+    var artStyles = {};
+    connected.forEach(function (k) {
+      var p = k.split(","), c = +p[0], r = +p[1], cell = G.board[r][c], gd = GEARS[cell.gid];
+      if (gd.fam && gd.fam !== "core") { x.fam[gd.fam] = (x.fam[gd.fam] || 0) + 1; x.n++; }
+      if (cell.graphic) { x.artCount++; artStyles[cell.graphic] = (artStyles[cell.graphic] || 0) + 1; }
+    });
+    for (var sName in artStyles) if (artStyles[sName] > x.maxArt) x.maxArt = artStyles[sName];
+
+    // ---- base + trait scoring ----
+    var chips = 0, mult = 1, xmults = [];
     connected.forEach(function (k) {
       var p = k.split(","), c = +p[0], r = +p[1], cell = G.board[r][c], gd = GEARS[cell.gid];
       chips += gd.chips; mult += gd.mult;
-      if (gd.type === "chain") chips += 2 * (n - 1);
       if (gd.type === "xmult") xmults.push(gd.xmult);
       if (cell.graphic) { chips += GRAPHICS[cell.graphic].chips; mult += GRAPHICS[cell.graphic].mult; }
+      if (gd.trait) {
+        if (gd.trait.chips) chips += gd.trait.chips(x);
+        if (gd.trait.mult) mult += gd.trait.mult(x);
+      }
     });
+    // ---- adjacency: same art style (+3 mult) & same family (+1 mult) ----
     var wires = [];
     connected.forEach(function (k) {
       var p = k.split(","), c = +p[0], r = +p[1];
       [[1, 0], [0, 1]].forEach(function (dir) {
         var nc = c + dir[0], nr = r + dir[1]; if (!connected.has(nc + "," + nr)) return;
         wires.push([c, r, nc, nr]);
-        var a = G.board[r][c], b = G.board[nr][nc];
+        var a = G.board[r][c], b = G.board[nr][nc], ga = GEARS[a.gid], gb = GEARS[b.gid];
         if (a.graphic && b.graphic && a.graphic === b.graphic) mult += D.ART_SYNERGY_MULT;
+        if (ga.fam === gb.fam && ga.fam !== "core") mult += 1;
       });
     });
-    for (var x = 0; x < xmults.length; x++) mult *= xmults[x];
+    // ---- combos (Balatro-style hands) ----
+    var combos = [];
+    D.COMBOS.forEach(function (cm) {
+      if (cm.test(x)) { combos.push(cm); if (cm.chips) chips += cm.chips; if (cm.mult) mult += cm.mult; if (cm.xmult) xmults.push(cm.xmult); }
+    });
+    for (var i = 0; i < xmults.length; i++) mult *= xmults[i];
     mult = Math.round(mult * 100) / 100;
-    G.score = { chips: chips, mult: mult, hype: Math.round(chips * Math.max(mult, 0)), connected: connected, wires: wires, connCount: n };
+    G.score = { chips: chips, mult: mult, hype: Math.round(chips * Math.max(mult, 0)), connected: connected, wires: wires, connCount: connected.size, combos: combos, ctx: x };
     return G.score;
   }
 
@@ -441,25 +464,30 @@
     G.state = "run"; A.sfx.run(); G.log.push("> compiling build…");
     tut("ran");
 
-    var sc = computeScore();
-    // order connected by BFS distance from core for a nice cascade
+    var sc = computeScore(), xc = sc.ctx;
     var order = bfsOrder();
     var list = [];
     order.forEach(function (k) {
       var p = k.split(","), c = +p[0], r = +p[1], cell = G.board[r][c], gd = GEARS[cell.gid];
       var ctr = cellCenter(c, r);
-      var chip = gd.chips + (cell.graphic ? GRAPHICS[cell.graphic].chips : 0) + (gd.type === "chain" ? 2 * (sc.connCount - 1) : 0);
-      var mlt = gd.mult + (cell.graphic ? GRAPHICS[cell.graphic].mult : 0);
-      if (chip > 0) list.push({ x: ctr.x, y: ctr.y, txt: "+" + chip, color: "#5df0ff", addChips: chip });
-      if (mlt > 0) list.push({ x: ctr.x, y: ctr.y - 8, txt: "+" + mlt + "×", color: "#ff5df0", addMult: mlt });
-      if (gd.type === "xmult") list.push({ x: ctr.x, y: ctr.y - 8, txt: "×" + gd.xmult, color: "#ffcf4d", mulMult: gd.xmult });
+      var chip = gd.chips + (cell.graphic ? GRAPHICS[cell.graphic].chips : 0) + (gd.trait && gd.trait.chips ? gd.trait.chips(xc) : 0);
+      var mlt = gd.mult + (cell.graphic ? GRAPHICS[cell.graphic].mult : 0) + (gd.trait && gd.trait.mult ? gd.trait.mult(xc) : 0);
+      if (chip > 0) list.push({ x: ctr.x, y: ctr.y, txt: "+" + chip, color: "#5df0ff", addChips: chip, bump: [c, r] });
+      if (mlt > 0) list.push({ x: ctr.x, y: ctr.y - 8, txt: "+" + mlt + "×", color: "#ff5df0", addMult: mlt, bump: [c, r] });
+      if (gd.type === "xmult") list.push({ x: ctr.x, y: ctr.y - 8, txt: "×" + gd.xmult, color: "#ffcf4d", mulMult: gd.xmult, bump: [c, r] });
     });
-    // art synergy total
-    var synergy = 0;
-    sc.wires.forEach(function (w) { var a = G.board[w[1]][w[0]], b = G.board[w[3]][w[2]]; if (a.graphic && b.graphic && a.graphic === b.graphic) synergy += D.ART_SYNERGY_MULT; });
-    if (synergy > 0) { var cc = cellCenter(CORE.c, CORE.r); list.push({ x: cc.x, y: cc.y - 20, txt: "ART +" + synergy + "×", color: "#ffcf4d", addMult: synergy }); }
+    // adjacency synergies (art + family) tallied at the core
+    var synArt = 0, synFam = 0;
+    sc.wires.forEach(function (w) {
+      var a = G.board[w[1]][w[0]], b = G.board[w[3]][w[2]], ga = GEARS[a.gid], gb = GEARS[b.gid];
+      if (a.graphic && b.graphic && a.graphic === b.graphic) synArt += D.ART_SYNERGY_MULT;
+      if (ga.fam === gb.fam && ga.fam !== "core") synFam += 1;
+    });
+    var cc = cellCenter(CORE.c, CORE.r);
+    if (synArt > 0) list.push({ x: cc.x, y: cc.y - 20, txt: "ART SYNC +" + synArt + "×", color: "#ffcf4d", addMult: synArt });
+    if (synFam > 0) list.push({ x: cc.x, y: cc.y - 12, txt: "TYPE SYNC +" + synFam + "×", color: "#8ee65a", addMult: synFam });
 
-    G.run = { list: list, i: 0, timer: 0, chips: 0, mult: 1, phase: "cascade", final: 0, forced: !!forced, target: sc.hype };
+    G.run = { list: list, i: 0, timer: 0, chips: 0, mult: 1, phase: "cascade", final: 0, forced: !!forced, target: sc.hype, combos: (sc.combos || []).slice(), comboI: 0 };
   }
 
   function bfsOrder() {
@@ -474,31 +502,60 @@
 
   function updateRun(dt) {
     var run = G.run; if (!run) return;
+    if (!run.xmults) run.xmults = [];
     run.timer -= dt;
     if (run.phase === "cascade") {
       if (run.timer <= 0 && run.i < run.list.length) {
         var s = run.list[run.i++];
         if (s.addChips) run.chips += s.addChips;
         if (s.addMult) run.mult += s.addMult;
-        if (s.mulMult) run.mult = Math.round(run.mult * s.mulMult * 100) / 100;
+        if (s.mulMult) run.xmults.push(s.mulMult);   // apply multipliers LAST (matches computeScore)
         pop(s.x, s.y, s.txt, s.color, 15);
+        if (s.bump) bumpCell(s.bump[0], s.bump[1]);
         A.sfx.point();
-        run.timer = 0.16;
-      } else if (run.i >= run.list.length) { run.phase = "total"; run.timer = 0.6; }
+        run.timer = 0.14;
+      } else if (run.i >= run.list.length) { run.phase = "combos"; run.timer = 0.35; }
+    } else if (run.phase === "combos") {
+      if (run.timer <= 0) {
+        if (run.combos && run.comboI < run.combos.length) {
+          var cm = run.combos[run.comboI++];
+          if (cm.chips) run.chips += cm.chips;
+          if (cm.mult) run.mult += cm.mult;
+          if (cm.xmult) run.xmults.push(cm.xmult);
+          var cc0 = cellCenter(CORE.c, CORE.r);
+          pop(cc0.x, BY + ROWS * CELL / 2 - 24, cm.name, "#ffd24d", 20);
+          shake(5); A.sfx.cash();
+          run.timer = 0.5;
+        } else { run.phase = "xmult"; run.timer = 0.3; }
+      }
+    } else if (run.phase === "xmult") {
+      if (run.timer <= 0) {
+        if (run.xmults.length) {
+          var xm = run.xmults.shift();
+          run.mult = Math.round(run.mult * xm * 100) / 100;
+          var cc1 = cellCenter(CORE.c, CORE.r);
+          pop(cc1.x, BY + ROWS * CELL / 2, "×" + xm, "#ff5df0", 22);
+          shake(4); A.sfx.point();
+          run.timer = 0.3;
+        } else { run.phase = "total"; run.timer = 0.4; }
+      }
     } else if (run.phase === "total") {
       if (run.timer <= 0) {
         run.final = Math.round(run.chips * Math.max(run.mult, 0));
         var cc = cellCenter(CORE.c, CORE.r);
-        pop(cc.x, BY + ROWS * CELL / 2, run.final + " HYPE!", run.final >= G.goal ? "#8ee65a" : "#ff5d7a", 26);
-        A.sfx.cash();
+        pop(cc.x, BY + ROWS * CELL / 2, run.final + " HYPE!", run.final >= G.goal ? "#8ee65a" : "#ff5d7a", 28);
+        shake(run.final >= G.goal ? 9 : 4); A.sfx.cash();
         G.compiledHype = run.final;
         G.log.push("> build " + (run.final >= G.goal ? "OK" : "FAILED") + ": " + run.final + " HYPE");
-        run.phase = "done"; run.timer = 1.1;
+        run.phase = "done"; run.timer = 1.2;
       }
     } else if (run.phase === "done") {
       if (run.timer <= 0) { G.run = null; els.runBtn.disabled = false; finalizeDay(); }
     }
   }
+
+  function bumpCell(c, r) { if (G.board[r] && G.board[r][c]) G.board[r][c].pop = 1; }
+  function shake(mag) { G.shake = Math.max(G.shake || 0, mag); }
 
   function finalizeDay() {
     var hype = G.compiledHype, passed = hype >= G.goal, isFinal = G.day === DAYS.length - 1;
@@ -614,12 +671,14 @@
 
   function update(dt, t) {
     G.blinkT += dt;
-    // spin board gears
+    if (G.shake) G.shake = Math.max(0, G.shake - dt * 28);
+    // spin board gears + decay place/pop bounce
     if (G.board.length) for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
       var cell = G.board[r][c]; if (!cell.gid) continue;
       var conn = G.score.connected.has(c + "," + r);
       var sp = conn ? (G.run ? 10 : 2.2) : 0.5; if (cell.gid === "core") sp = G.run ? 10 : 2.6;
       cell.angle += sp * (((c + r) % 2) ? -1 : 1) * dt;
+      if (cell.pop) cell.pop = Math.max(0, cell.pop - dt * 3.2);
     }
     // countdown
     if (G.state === "build" && G.clockRunning && !G.tutActive) {
@@ -687,8 +746,11 @@
 
   function renderBuild(t) {
     R.clear(ctx);
-    var g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#14111f"); g.addColorStop(1, "#0e0b16");
+    var g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#1a1420"); g.addColorStop(1, "#120d16");
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+    ctx.save();
+    if (G.shake) ctx.translate((Math.random() - 0.5) * G.shake, (Math.random() - 0.5) * G.shake);
 
     // toolbar
     R.px(ctx, 0, 0, W, 30, "#1b1730");
@@ -719,15 +781,25 @@
         if (ok) { ctx.save(); ctx.globalAlpha = 0.18; R.px(ctx, x + 2, y + 2, CELL - 4, CELL - 4, col); ctx.restore(); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.strokeRect(x + 2.5, y + 2.5, CELL - 5, CELL - 5); }
       }
     }
-    // wires
+    // wires (with flowing energy pulses — factory feel)
     ctx.save(); ctx.strokeStyle = "#4a3f6a"; ctx.lineWidth = 3; ctx.lineCap = "round";
     G.score.wires.forEach(function (w) { var a = cellCenter(w[0], w[1]), b = cellCenter(w[2], w[3]); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }); ctx.restore();
-    // gears
+    var flowSpd = G.run ? 2.2 : 0.9;
+    G.score.wires.forEach(function (w, wi) {
+      var a = cellCenter(w[0], w[1]), b = cellCenter(w[2], w[3]);
+      for (var pu = 0; pu < 2; pu++) {
+        var frac = (t * flowSpd + wi * 0.31 + pu * 0.5) % 1;
+        var px2 = a.x + (b.x - a.x) * frac, py = a.y + (b.y - a.y) * frac;
+        ctx.save(); ctx.globalAlpha = 0.85; R.circle(ctx, px2, py, 2.2, "#7ef0ff"); ctx.restore();
+      }
+    });
+    // gears (with place/score bounce)
     var blink = (G.blinkT % 3.2) < 0.12;
     for (var r2 = 0; r2 < ROWS; r2++) for (var c2 = 0; c2 < COLS; c2++) {
       var cl = G.board[r2][c2]; if (!cl.gid) continue;
       var ctr = cellCenter(c2, r2), gd = GEARS[cl.gid], conn = G.score.connected.has(c2 + "," + r2);
-      R.gear(ctx, ctr.x, ctr.y, CELL * 0.35, gd, cl.angle, { glow: conn, glowColor: cl.gid === "core" ? "#ffcf4d" : "#5df0ff", graphicTint: cl.graphic ? GRAPHICS[cl.graphic].tint : null, t: G.blinkT, blink: blink && conn });
+      var rad = CELL * 0.35 * (1 + 0.4 * (cl.pop || 0));
+      R.gear(ctx, ctr.x, ctr.y, rad, gd, cl.angle, { glow: conn, glowColor: cl.gid === "core" ? "#ffcf4d" : (gd.fam && D.TYPES[gd.fam] ? D.TYPES[gd.fam].color : "#5df0ff"), graphicTint: cl.graphic ? GRAPHICS[cl.graphic].tint : null, t: G.blinkT, blink: blink && conn });
       if (!conn) { ctx.save(); ctx.globalAlpha = 0.42; R.circle(ctx, ctr.x, ctr.y, CELL * 0.37, "#100d1c"); ctx.restore(); }
     }
     // inspector content
@@ -735,9 +807,11 @@
     // console lines
     renderConsole();
     // pops
-    ctx.save(); ctx.textAlign = "center"; ctx.font = "bold 11px 'Courier New',monospace";
+    ctx.save(); ctx.textAlign = "center";
     G.pops.forEach(function (p) { ctx.globalAlpha = Math.max(0, Math.min(1, p.life)); ctx.font = "bold " + p.size + "px 'Courier New',monospace"; ctx.fillStyle = "#000"; ctx.fillText(p.txt, p.x + 1, p.y + 1); ctx.fillStyle = p.color; ctx.fillText(p.txt, p.x, p.y); });
     ctx.restore(); ctx.textAlign = "left";
+
+    ctx.restore(); // end shake
   }
 
   function renderInspector(t) {
@@ -755,6 +829,12 @@
     var col = frac >= 1 ? "#8ee65a" : (frac > 0.6 ? "#ffd24d" : (frac > 0.3 ? "#ff8a3d" : "#ff5d7a"));
     R.px(ctx, gx, gy + gh - fh, gw, fh, col);
     ctx.strokeStyle = "#8ee65a"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(gx - 3, gy); ctx.lineTo(gx + gw + 3, gy); ctx.stroke();
+    // active combos (Balatro-style hands) preview
+    var combos = G.score.combos || [];
+    ctx.textAlign = "left"; ctx.font = "7px 'Courier New',monospace";
+    if (combos.length) { ctx.fillStyle = "#9a93b8"; ctx.fillText("COMBOS", p.x + 6, gy + 4); }
+    combos.slice(0, 7).forEach(function (cm, i) { ctx.fillStyle = "#ffd24d"; ctx.fillText("★" + cm.name, p.x + 6, gy + 15 + i * 10); });
+    ctx.textAlign = "center";
     // sitting dev reacting
     var mood = hype >= G.goal ? "cheer" : "sit";
     R.playerSprite(ctx, mood, cx, p.y + p.h - 8, 52, false, t, mood === "cheer" ? "happy" : "");
@@ -804,6 +884,7 @@
       var cv = document.createElement("canvas"); cv.width = 40; cv.height = 40;
       if (kind === "gear") R.gearThumb(cv, def); else R.graphicThumb(cv, def);
       div.appendChild(cv);
+      if (kind === "gear" && def.fam && D.TYPES[def.fam]) div.style.borderTopColor = D.TYPES[def.fam].color;
       var nm = document.createElement("div"); nm.className = "c-name"; nm.textContent = def.name; div.appendChild(nm);
       var st = document.createElement("div"); st.className = "c-stat"; st.textContent = statLine(id, kind); div.appendChild(st);
       var cost = document.createElement("div"); cost.className = "c-cost"; cost.textContent = "⚡" + def.energy + "  ×" + remaining; div.appendChild(cost);
@@ -816,9 +897,10 @@
 
   function statLine(id, kind) {
     var d = kind === "gear" ? GEARS[id] : GRAPHICS[id], s = [];
-    if (kind === "gear") { if (d.type === "xmult") return "×" + d.xmult + (d.chips ? " +" + d.chips + "c" : ""); if (d.type === "chain") return "+2c/gear"; }
+    if (kind === "gear" && d.type === "xmult") s.push("×" + d.xmult);
     if (d.chips) s.push("+" + d.chips + "c"); if (d.mult) s.push("+" + d.mult + "m");
-    return s.join(" ") || "—";
+    if (!s.length) return "★ trait";
+    return s.join(" ");
   }
 
   // =========================================================
@@ -839,15 +921,29 @@
   }
   function toast(m) { clearTimeout(G.toastTimer); els.status.textContent = m; els.status.classList.remove("hidden"); els.status.style.color = "#ff5d8f"; G.toastTimer = setTimeout(updateHint, 1700); }
 
+  function famTag(gd) {
+    if (!gd.fam || !D.TYPES[gd.fam]) return "";
+    var ty = D.TYPES[gd.fam];
+    return '<div class="tt-fam" style="color:' + ty.color + '">◆ ' + ty.name + '</div>';
+  }
+  function traitTag(gd) { return (gd.trait && gd.trait.text) ? '<div class="tt-trait">★ ' + gd.trait.text + '</div>' : ""; }
+
   function showCardTip(id, kind, cx, cy) {
     var d = kind === "gear" ? GEARS[id] : GRAPHICS[id];
-    var extra = kind === "graphic" ? '<div class="tt-tag">same-style bonus +' + D.ART_SYNERGY_MULT + ' mult</div>' : "";
-    showTip('<div class="tt-name">' + d.name + '</div><div class="tt-tag">' + statLine(id, kind) + '</div>' + extra + '<div>' + d.blurb + '</div><div class="tt-cost">⚡' + d.energy + ' energy</div>', cx, cy);
+    var head, body;
+    if (kind === "gear") {
+      head = famTag(d);
+      body = '<div class="tt-tag">' + statLine(id, kind) + '</div>' + traitTag(d);
+    } else {
+      head = "";
+      body = '<div class="tt-tag">' + statLine(id, kind) + ' · same-style +' + D.ART_SYNERGY_MULT + ' mult</div>';
+    }
+    showTip('<div class="tt-name">' + d.name + '</div>' + head + body + '<div>' + d.blurb + '</div><div class="tt-cost">⚡' + d.energy + ' energy</div>', cx, cy);
   }
   function showGearTip(cell, cx, cy) {
     var gd = GEARS[cell.gid];
     var extra = cell.graphic ? '<div class="tt-tag">art: ' + GRAPHICS[cell.graphic].name + '</div>' : "";
-    showTip('<div class="tt-name">' + gd.name + '</div><div>' + gd.blurb + '</div>' + extra + (cell.gid === "core" ? "" : '<div class="tt-cost">click to move · Esc to return</div>'), cx, cy);
+    showTip('<div class="tt-name">' + gd.name + '</div>' + famTag(gd) + traitTag(gd) + extra + '<div>' + gd.blurb + '</div>' + (cell.gid === "core" ? "" : '<div class="tt-cost">click to move · Esc to return</div>'), cx, cy);
   }
   function showTip(html, cx, cy) {
     els.tooltip.innerHTML = html; els.tooltip.classList.remove("hidden");

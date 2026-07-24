@@ -370,3 +370,8 @@ body{
 
 /* loading */
 #loading .modal{ border-color:var(--good); }
+
+/* v3 — gear families, traits, combos */
+.card{ border-top-width:3px; }
+#tooltip .tt-fam{ font-size:11px; margin:2px 0; }
+#tooltip .tt-trait{ color:#ffd24d; font-size:11px; margin:3px 0; line-height:1.4; }

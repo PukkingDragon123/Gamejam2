@@ -30,26 +30,50 @@
      icon: glyph key drawn on the cog
      rarity: 'common'|'uncommon'|'rare'
   --------------------------------------------------------- */
+  // fam = gear "family/type" (match these for combos, Balatro-style).
+  // trait = a conditional bonus that reads the connected machine.
+  //   trait ctx x = { n:gearsWired(excl core), fam:{move,act,content,system,feel},
+  //                   artCount:#applied styles, maxArt:largest same-style count }
   var GEARS = {
-    core:   { id:"core",   type:"core",  name:"CORE LOOP",  icon:"core",   teeth:8,  chips:4,  mult:0, energy:0, tint:"#ffcf4d", rarity:"core",     blurb:"The heart of your game. Everything wires back to this." },
+    core:   { id:"core", type:"core", fam:"core", name:"CORE LOOP", icon:"core", teeth:8, chips:4, mult:0, energy:0, tint:"#ffcf4d", rarity:"core", blurb:"The heart of your game. Everything wires back to it.", trait:{ text:"Every gear scores through the CORE." } },
 
-    jump:   { id:"jump",   type:"chips", name:"JUMP",       icon:"up",     teeth:6,  chips:3,  mult:0, energy:2, tint:"#5ad1ff", rarity:"common",   blurb:"+3 chips. Press button, go up. A classic." },
-    shoot:  { id:"shoot",  type:"chips", name:"SHOOT",      icon:"bullet", teeth:6,  chips:4,  mult:0, energy:2, tint:"#ff934d", rarity:"common",   blurb:"+4 chips. Pew pew. Instant appeal." },
-    dash:   { id:"dash",   type:"chips", name:"DASH",       icon:"dash",   teeth:7,  chips:6,  mult:0, energy:3, tint:"#8ee65a", rarity:"common",   blurb:"+6 chips. Everybody loves a good dash." },
-    collect:{ id:"collect",type:"both",  name:"COLLECT",    icon:"coin",   teeth:6,  chips:2,  mult:1, energy:3, tint:"#ffd94d", rarity:"common",   blurb:"+2 chips & +1 mult. Shiny things to grab." },
-    music:  { id:"music",  type:"chips", name:"CHIPTUNE",   icon:"note",   teeth:6,  chips:5,  mult:0, energy:3, tint:"#c58bff", rarity:"common",   blurb:"+5 chips. A banger soundtrack sells itself." },
+    jump:   { id:"jump", type:"chips", fam:"move", name:"JUMP", icon:"up", teeth:6, chips:3, mult:0, energy:2, tint:"#5ad1ff", rarity:"common", blurb:"Press button, go up. A classic.", trait:{ text:"+2 chips per Movement gear wired", chips:function(x){ return 2 * (x.fam.move || 0); } } },
+    shoot:  { id:"shoot", type:"chips", fam:"act", name:"SHOOT", icon:"bullet", teeth:6, chips:4, mult:0, energy:2, tint:"#ff934d", rarity:"common", blurb:"Pew pew. Instant appeal.", trait:{ text:"+3 chips per Action gear wired", chips:function(x){ return 3 * (x.fam.act || 0); } } },
+    dash:   { id:"dash", type:"chips", fam:"move", name:"DASH", icon:"dash", teeth:7, chips:5, mult:0, energy:3, tint:"#8ee65a", rarity:"common", blurb:"Everybody loves a good dash.", trait:{ text:"+1 mult per Movement gear wired", mult:function(x){ return (x.fam.move || 0); } } },
+    collect:{ id:"collect", type:"both", fam:"content", name:"COLLECT", icon:"coin", teeth:6, chips:2, mult:1, energy:3, tint:"#ffd94d", rarity:"common", blurb:"Shiny things to grab.", trait:{ text:"+1 mult per 3 gears wired", mult:function(x){ return Math.floor(x.n / 3); } } },
+    music:  { id:"music", type:"chips", fam:"feel", name:"CHIPTUNE", icon:"note", teeth:6, chips:5, mult:0, energy:3, tint:"#c58bff", rarity:"common", blurb:"A banger soundtrack sells itself.", trait:{ text:"+1 mult per other Feel gear", mult:function(x){ return Math.max(0, (x.fam.feel || 0) - 1); } } },
 
-    physics:{ id:"physics",type:"both",  name:"PHYSICS",    icon:"ball",   teeth:9,  chips:5,  mult:2, energy:5, tint:"#7aa2ff", rarity:"uncommon", blurb:"+5 chips & +2 mult. Ragdolls sell copies." },
-    story:  { id:"story",  type:"chips", name:"STORY MODE", icon:"bubble", teeth:8,  chips:9,  mult:0, energy:4, tint:"#ff8ac2", rarity:"uncommon", blurb:"+9 chips. Made a stranger cry (happy tears)." },
-    juice:  { id:"juice",  type:"mult",  name:"GAME JUICE", icon:"spark",  teeth:8,  chips:0,  mult:3, energy:4, tint:"#ffe14d", rarity:"uncommon", blurb:"+3 mult. Screenshake, squash, sparkle." },
-    skill:  { id:"skill",  type:"chain", name:"SKILL TREE", icon:"branch", teeth:10, chips:0,  mult:0, energy:4, tint:"#5fe0a8", rarity:"uncommon", blurb:"+2 chips for every connected gear." },
-    save:   { id:"save",   type:"both",  name:"SAVE SYS",   icon:"disk",   teeth:7,  chips:4,  mult:1, energy:3, tint:"#9aa7c7", rarity:"uncommon", blurb:"+4 chips & +1 mult. Respect the player's time." },
+    physics:{ id:"physics", type:"both", fam:"feel", name:"PHYSICS", icon:"ball", teeth:9, chips:5, mult:2, energy:5, tint:"#7aa2ff", rarity:"uncommon", blurb:"Ragdolls sell copies.", trait:{ text:"+1 mult per 4 gears wired", mult:function(x){ return Math.floor(x.n / 4); } } },
+    story:  { id:"story", type:"chips", fam:"content", name:"STORY MODE", icon:"bubble", teeth:8, chips:8, mult:0, energy:4, tint:"#ff8ac2", rarity:"uncommon", blurb:"Made a stranger cry (happy tears).", trait:{ text:"+4 chips per Feel gear wired", chips:function(x){ return 4 * (x.fam.feel || 0); } } },
+    juice:  { id:"juice", type:"mult", fam:"feel", name:"GAME JUICE", icon:"spark", teeth:8, chips:0, mult:2, energy:4, tint:"#ffe14d", rarity:"uncommon", blurb:"Screenshake, squash, sparkle.", trait:{ text:"+2 mult per art style applied", mult:function(x){ return 2 * x.artCount; } } },
+    skill:  { id:"skill", type:"chips", fam:"system", name:"SKILL TREE", icon:"branch", teeth:10, chips:0, mult:0, energy:4, tint:"#5fe0a8", rarity:"uncommon", blurb:"Depth through progression.", trait:{ text:"+2 chips per gear wired", chips:function(x){ return 2 * x.n; } } },
+    save:   { id:"save", type:"both", fam:"system", name:"SAVE SYS", icon:"disk", teeth:7, chips:4, mult:1, energy:3, tint:"#9aa7c7", rarity:"uncommon", blurb:"Respect the player's time.", trait:{ text:"+5 chips if 6+ gears wired", chips:function(x){ return x.n >= 6 ? 5 : 0; } } },
 
-    boss:   { id:"boss",   type:"chips", name:"BOSS FIGHT", icon:"skull",  teeth:12, chips:18, mult:0, energy:6, tint:"#ff5d7a", rarity:"rare",     blurb:"+18 chips. Huge, heavy, thrilling." },
-    proc:   { id:"proc",   type:"mult",  name:"PROC-GEN",   icon:"infin",  teeth:8,  chips:0,  mult:6, energy:5, tint:"#b57bff", rarity:"rare",     blurb:"+6 mult. Infinite content, zero sleep." },
-    combo:  { id:"combo",  type:"xmult", name:"COMBO SYS",  icon:"cross",  teeth:8,  xmult:1.5, chips:0, mult:0, energy:6, tint:"#ff5df0", rarity:"rare",  blurb:"×1.5 to your whole mult. Stacks!" },
-    online: { id:"online", type:"xmult", name:"MULTIPLAYER",icon:"people", teeth:9,  xmult:1.5, chips:2, mult:0, energy:7, tint:"#5df0ff", rarity:"rare", blurb:"+2 chips, ×1.5 mult. Now with friends (and lag)." }
+    boss:   { id:"boss", type:"chips", fam:"act", name:"BOSS FIGHT", icon:"skull", teeth:12, chips:16, mult:0, energy:6, tint:"#ff5d7a", rarity:"rare", blurb:"Huge, heavy, thrilling.", trait:{ text:"+10 chips if any Feel gear wired", chips:function(x){ return (x.fam.feel || 0) > 0 ? 10 : 0; } } },
+    proc:   { id:"proc", type:"mult", fam:"content", name:"PROC-GEN", icon:"infin", teeth:8, chips:0, mult:4, energy:5, tint:"#b57bff", rarity:"rare", blurb:"Infinite content, zero sleep.", trait:{ text:"+2 mult per Content gear wired", mult:function(x){ return 2 * (x.fam.content || 0); } } },
+    combo:  { id:"combo", type:"xmult", fam:"system", name:"COMBO SYS", icon:"cross", teeth:8, xmult:1.5, chips:0, mult:0, energy:6, tint:"#ff5df0", rarity:"rare", blurb:"Chain reactions!", trait:{ text:"×1.5 to total mult (stacks!)" } },
+    online: { id:"online", type:"xmult", fam:"system", name:"MULTIPLAYER", icon:"people", teeth:9, xmult:1.5, chips:2, mult:0, energy:7, tint:"#5df0ff", rarity:"rare", blurb:"Now with friends (and lag).", trait:{ text:"+2 chips, ×1.5 to total mult" } }
   };
+
+  // Gear families — match these to trigger combos (like Balatro suits).
+  var TYPES = {
+    move:    { name:"Movement", color:"#5df0ff", icon:"up" },
+    act:     { name:"Action",   color:"#ff7a4d", icon:"bullet" },
+    content: { name:"Content",  color:"#b57bff", icon:"infin" },
+    system:  { name:"System",   color:"#5fe0a8", icon:"disk" },
+    feel:    { name:"Feel",     color:"#ffd24d", icon:"spark" }
+  };
+
+  // COMBOS — Balatro-style "hands". If present in the wired machine, they
+  // pop a flashy banner during RUN and add their bonus.
+  var COMBOS = [
+    { id:"speedrun",   name:"SPEEDRUN!",      desc:"2+ Movement gears",         test:function(x){ return (x.fam.move || 0) >= 2; },     mult:4 },
+    { id:"bullethell", name:"BULLET HELL!",   desc:"2+ Action gears",           test:function(x){ return (x.fam.act || 0) >= 2; },      chips:16 },
+    { id:"juicebar",   name:"JUICE BAR!",     desc:"2+ Feel gears",             test:function(x){ return (x.fam.feel || 0) >= 2; },     mult:5 },
+    { id:"contentfarm",name:"CONTENT FARM!",  desc:"3+ Content gears",          test:function(x){ return (x.fam.content || 0) >= 3; },  xmult:1.5 },
+    { id:"artdir",     name:"ART DIRECTION!", desc:"3+ gears share an art style",test:function(x){ return x.maxArt >= 3; },             mult:6 },
+    { id:"fullstack",  name:"FULL STACK!",    desc:"all 5 gear types wired",    test:function(x){ return ["move","act","content","system","feel"].every(function(f){ return (x.fam[f] || 0) >= 1; }); }, chips:25, xmult:1.5 }
+  ];
 
   /* ---------------------------------------------------------
      GRAPHICS (art styles) — applied on top of a gear.
@@ -172,6 +196,8 @@
   global.JamData = {
     LAYOUT: LAYOUT,
     GEARS: GEARS,
+    TYPES: TYPES,
+    COMBOS: COMBOS,
     GRAPHICS: GRAPHICS,
     ART_SYNERGY_MULT: ART_SYNERGY_MULT,
     DRINKS: DRINKS,
