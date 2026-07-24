@@ -55,6 +55,12 @@
     window.addEventListener("keydown", onKey);
     window.addEventListener("pointerdown", function () { A.unlock(); }, { once: true });
 
+    // animated room background (GIF/PNG) as a DOM layer behind the canvas
+    G.roomOk = false;
+    els.roombg.onload = function () { G.roomOk = true; };
+    els.roombg.onerror = function () { G.roomOk = false; };
+    els.roombg.src = "assets/room.gif";
+
     // load assets with a progress bar, then show title
     var msg = els.loadMsg;
     AS.load(function () {
@@ -70,7 +76,7 @@
   function grab() {
     var id = function (s) { return document.getElementById(s); };
     els.hud = id("hud"); els.tray = id("tray"); els.hand = id("hand"); els.overlay = id("overlay");
-    els.tooltip = id("tooltip"); els.status = id("statusbar"); els.stage = id("stage"); els.tut = id("tutorial");
+    els.tooltip = id("tooltip"); els.status = id("statusbar"); els.stage = id("stage"); els.tut = id("tutorial"); els.roombg = id("roombg");
     els.day = id("hud-day"); els.goal = id("hud-goal"); els.clock = id("hud-clock"); els.clockWrap = id("hud-clock-wrap");
     els.energy = id("hud-energy"); els.hype = id("hud-hype"); els.barEnergy = id("bar-energy");
     els.chipsOut = id("chips-out"); els.multOut = id("mult-out"); els.runBtn = id("btn-run"); els.muteBtn = id("btn-mute");
@@ -200,16 +206,26 @@
   }
   function startPack() {
     G.state = "pack";
-    // three distinct cards
-    var cards = [], guard = 0;
-    while (cards.length < 3 && guard++ < 100) {
-      var c = drawCard();
-      if (!cards.some(function (x) { return x.kind === c.kind && x.id === c.id; })) cards.push(c);
-    }
-    G.packCards = cards; G.chosenCard = null;
+    var roll = Math.random();
+    var packType = roll < 0.55 ? "gears" : (roll < 0.85 ? "graphics" : "pets");
+    G.packCards = drawThemedCards(packType, 3);
+    G.chosenCard = null;
     applyChrome();
-    var packType = Math.random() < 0.5 ? "gears" : "graphics";
     renderPackOverlay(false, packType);
+  }
+
+  // Themed packs bias what they contain (still rarity-weighted).
+  function drawThemedCards(type, n) {
+    var pool = drawPool;
+    if (type === "gears") pool = drawPool.filter(function (c) { return c.kind === "gear"; });
+    else if (type === "graphics") pool = drawPool.filter(function (c) { return c.kind === "graphic"; });
+    var cards = [], guard = 0;
+    while (cards.length < n && guard++ < 300) {
+      var pk = pool[(Math.random() * pool.length) | 0];
+      if (type === "pets" && pk.rarity === "common" && Math.random() < 0.6) continue; // pets skew rare
+      if (!cards.some(function (x) { return x.kind === pk.kind && x.id === pk.id; })) cards.push({ kind: pk.kind, id: pk.id, rarity: pk.rarity });
+    }
+    return cards;
   }
 
   function renderPackOverlay(opened, packType) {
@@ -631,13 +647,17 @@
 
   function render(t) {
     ctx.imageSmoothingEnabled = false;
-    if (G.state === "build" || G.state === "run") renderBuild(t);
+    var idePhase = (G.state === "build" || G.state === "run");
+    // show the animated GIF room layer behind the canvas except in the IDE
+    els.roombg.classList.toggle("hidden", !(G.roomOk && !idePhase));
+
+    if (idePhase) renderBuild(t);
     else if (G.state === "room") renderRoom(t);
-    else if (G.state === "title" || G.state === "brief" || G.state === "pack" || G.state === "install" || G.state === "drinks" || G.state === "win" || G.state === "gameover") {
-      // ambient room behind modals
-      R.roomScene(ctx, t, {});
+    else {
+      // ambient behind modals: gif shows through a cleared canvas, else fallback
+      if (G.roomOk) R.clear(ctx); else R.roomScene(ctx, t, {});
     }
-    // pack preview animation
+    // pack preview animation (procedural fallback only; asset packs animate in overlay)
     if (G.state === "pack" && G._packAnim && G._packAnim.cv && document.body.contains(G._packAnim.cv)) {
       var pa = G._packAnim; pa.ctx.clearRect(0, 0, pa.cv.width, pa.cv.height);
       R.packSprite(pa.ctx, pa.type, pa.cv.width / 2, pa.cv.height / 2, pa.cv.height * 0.92, t);
@@ -645,16 +665,23 @@
   }
 
   function renderRoom(t) {
-    R.roomScene(ctx, t, { hoverComputer: G.hoverComputer });
+    if (G.roomOk) R.clear(ctx); else R.roomScene(ctx, t, { hoverComputer: G.hoverComputer });
     var pl = G.player, room = CONFIG.room, hgt = room.playerScale * H;
+    var z = room.computerZone;
+    // computer hover highlight (drawn over the gif)
+    if (G.hoverComputer) {
+      ctx.save(); ctx.strokeStyle = "#ffe08a"; ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.5 + 0.35 * Math.sin(t * 6);
+      R.rr(ctx, z.x * W + 2, z.y * H, z.w * W - 4, z.h * H, 6); ctx.stroke(); ctx.restore();
+    }
     var frame = pl.moving ? (Math.floor(pl.animT / 0.18) % 2 ? "walkB" : "walkA") : "back";
     R.playerSprite(ctx, frame, pl.x, pl.feetY, hgt, pl.facing === 1, t, "");
     // "WORK" prompt near computer
-    if (G.hoverComputer || Math.abs(pl.x - room.computerStand.x * W) < 40) {
-      var z = room.computerZone;
-      ctx.save(); ctx.font = "bold 10px 'Courier New',monospace"; ctx.textAlign = "center";
-      ctx.fillStyle = "#0d0b16"; R.fillRR(ctx, z.x * W + z.w * W / 2 - 44, z.y * H - 16, 88, 15, 4, "rgba(13,11,22,.85)");
-      ctx.fillStyle = "#ffcf4d"; ctx.fillText("▸ CLICK TO WORK", z.x * W + z.w * W / 2, z.y * H - 5); ctx.restore();
+    if (G.hoverComputer || Math.abs(pl.x - room.computerStand.x * W) < 44) {
+      ctx.save(); ctx.textAlign = "center";
+      R.fillRR(ctx, z.x * W + z.w * W / 2 - 48, z.y * H - 18, 96, 15, 4, "rgba(24,16,10,.9)");
+      ctx.font = "bold 10px 'Courier New',monospace"; ctx.fillStyle = "#ffcf4d";
+      ctx.fillText("▸ CLICK TO WORK", z.x * W + z.w * W / 2, z.y * H - 7); ctx.restore();
     }
   }
 

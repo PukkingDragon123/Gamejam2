@@ -138,13 +138,14 @@
 
     // Walkable room. Coords are normalized (0..1) over the room image,
     // so they track the background whatever its native resolution.
+    // Tuned for assets/room.gif (retro CRT computer on the left).
     room: {
-      floorY: [0.74, 0.88],        // player Y range (feet) on the carpet
-      computerZone: { x: 0.02, y: 0.42, w: 0.30, h: 0.34 }, // the desk/PC
-      computerStand: { x: 0.135, y: 0.86 }, // where the player stands to work
-      spawnX: 0.72,                // where the dev walks in from
-      playerScale: 0.30,           // sprite height as fraction of canvas height
-      walkSpeed: 0.32              // fraction of width per second
+      floorY: [0.82, 0.93],        // player Y range (feet) on the carpet
+      computerZone: { x: 0.0, y: 0.44, w: 0.26, h: 0.30 }, // the CRT/desk
+      computerStand: { x: 0.20, y: 0.9 }, // where the player stands to work
+      spawnX: 0.6,                 // where the dev walks in from
+      playerScale: 0.34,           // sprite height as fraction of canvas height
+      walkSpeed: 0.3               // fraction of width per second
     },
 
     // assets/player.png sheet layout + named frames (grid cell indices).

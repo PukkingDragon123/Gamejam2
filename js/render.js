@@ -606,7 +606,7 @@
   // ---- booster pack (image if available, else procedural) ----
   function packSprite(ctx, type, cx, cy, targetH, t) {
     var A = AS();
-    var name = type === "graphics" ? "pack_graphics" : "pack_gears";
+    var name = type === "graphics" ? "pack_graphics" : (type === "pets" ? "pack_pets" : "pack_gears");
     if (A && A.has(name)) {
       var cv = A.get(name);
       var s = targetH / cv.height;
