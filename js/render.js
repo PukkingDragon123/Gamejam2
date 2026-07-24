@@ -160,73 +160,75 @@
     ctx.closePath(); ctx.fill();
   }
 
-  // -------------------------------------------------- GEAR (cute)
+  // -------------------------------------------------- GEAR (machined metal, 3D)
   function gear(ctx, cx, cy, r, gdef, angle, opts) {
     opts = opts || {};
     var tint = gdef.tint;
-    var dark = shade(tint, -0.4), light = shade(tint, 0.4);
+    var edge = shade(tint, -0.68), dark = shade(tint, -0.42), mid = shade(tint, -0.08),
+        lite = shade(tint, 0.32), hi = shade(tint, 0.6);
 
-    // soft shadow
-    ctx.save(); ctx.globalAlpha = 0.22; circle(ctx, cx, cy + r * 0.32, r * 0.95, "#000"); ctx.restore();
+    // grounded contact shadow
+    ctx.save(); ctx.globalAlpha = 0.28; ctx.beginPath(); ctx.ellipse(cx, cy + r * 0.86, r * 0.86, r * 0.26, 0, 0, 6.28); ctx.fillStyle = "#000"; ctx.fill(); ctx.restore();
 
-    // connection glow
+    // connection rim-glow
     if (opts.glow) {
-      ctx.save();
-      ctx.globalAlpha = 0.30 + 0.14 * Math.sin(angle * 3);
-      circle(ctx, cx, cy, r + 4, opts.glowColor || "#ffcf4d");
-      ctx.restore();
+      ctx.save(); ctx.globalAlpha = 0.32 + 0.12 * Math.sin((opts.t || 0) * 4);
+      circle(ctx, cx, cy, r + 3.5, opts.glowColor || "#ffcf4d"); ctx.restore();
     }
 
-    // rotating body
+    // ---- rotating cog ----
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(angle);
     var teeth = gdef.teeth || 8, step = 6.2832 / teeth;
+    // teeth: shaded trapezoid blocks with a lit top facet
     for (var i = 0; i < teeth; i++) {
-      var a = i * step;
-      var tx = Math.cos(a) * r, ty = Math.sin(a) * r;
-      ctx.save(); ctx.translate(tx, ty); ctx.rotate(a);
-      fillRR(ctx, -r * 0.16, -r * 0.16, r * 0.32, r * 0.42, r * 0.12, dark);
-      fillRR(ctx, -r * 0.13, -r * 0.16, r * 0.26, r * 0.34, r * 0.1, tint);
+      ctx.save(); ctx.rotate(i * step);
+      var tw = r * 0.30, th = r * 0.34, ty = -r - th * 0.18;
+      ctx.fillStyle = edge; fillRR(ctx, -tw * 0.62, ty, tw * 1.24, th + 2, r * 0.06);   // dark base/side
+      ctx.fillStyle = mid;  fillRR(ctx, -tw * 0.5, ty, tw, th, r * 0.05);                // face
+      ctx.fillStyle = hi; ctx.globalAlpha = 0.55; fillRR(ctx, -tw * 0.4, ty, tw * 0.8, th * 0.34, r * 0.05); ctx.globalAlpha = 1; // top light
       ctx.restore();
     }
-    circle(ctx, 0, 0, r, dark);
-    circle(ctx, 0, 0, r - 1.5, tint);
-    ctx.save(); ctx.globalAlpha = 0.5; circle(ctx, -r * 0.3, -r * 0.3, r * 0.5, light); ctx.restore();
+    // body disc — radial metal gradient
+    var bg = ctx.createRadialGradient(-r * 0.34, -r * 0.34, r * 0.08, 0, 0, r);
+    bg.addColorStop(0, lite); bg.addColorStop(0.55, mid); bg.addColorStop(1, dark);
+    ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(0, 0, r, 0, 6.28); ctx.fill();
+    // outer bevel ring
+    ctx.lineWidth = Math.max(1.5, r * 0.11); ctx.strokeStyle = edge; ctx.beginPath(); ctx.arc(0, 0, r * 0.9, 0, 6.28); ctx.stroke();
+    ctx.lineWidth = Math.max(1, r * 0.05); ctx.strokeStyle = hi; ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.arc(0, 0, r * 0.82, Math.PI * 1.05, Math.PI * 1.75); ctx.stroke(); ctx.globalAlpha = 1;
+    // spokes (rotate with cog)
+    for (var sp = 0; sp < 4; sp++) {
+      ctx.save(); ctx.rotate(sp * 1.5708);
+      ctx.fillStyle = dark; fillRR(ctx, -r * 0.09, -r * 0.66, r * 0.18, r * 0.5, r * 0.06);
+      ctx.fillStyle = lite; ctx.globalAlpha = 0.5; fillRR(ctx, -r * 0.075, -r * 0.66, r * 0.05, r * 0.5, r * 0.04); ctx.globalAlpha = 1;
+      ctx.restore();
+    }
     ctx.restore();
 
-    // static cute cap + face
-    circle(ctx, cx, cy, r * 0.62, shade(tint, -0.18));
-    circle(ctx, cx, cy, r * 0.54, shade(tint, 0.12));
-
-    // mechanic glyph, faint, behind eyes
-    ctx.save(); ctx.globalAlpha = 0.85;
-    glyph(ctx, gdef.icon, cx, cy + r * 0.02, r * 0.72, shade(tint, -0.55));
-    ctx.restore();
-
-    // googly eyes (static, goofy)
-    if (opts.eyes !== false) {
-      var blink = opts.blink;
-      var eyeY = cy - r * 0.16, ex = r * 0.24, eR = r * 0.17;
-      var look = opts.glow ? Math.sin((opts.t || 0) * 2) * eR * 0.3 : 0;
-      circle(ctx, cx - ex, eyeY, eR, "#fff");
-      circle(ctx, cx + ex, eyeY, eR, "#fff");
-      if (blink) {
-        px(ctx, cx - ex - eR, eyeY - 1, eR * 2, 2, shade(tint, -0.6));
-        px(ctx, cx + ex - eR, eyeY - 1, eR * 2, 2, shade(tint, -0.6));
-      } else {
-        circle(ctx, cx - ex + look, eyeY + eR * 0.2, eR * 0.5, "#2a2440");
-        circle(ctx, cx + ex + look, eyeY + eR * 0.2, eR * 0.5, "#2a2440");
-      }
+    // ---- static raised hub w/ engraved insignia ----
+    var hr = r * 0.5;
+    var hg = ctx.createRadialGradient(cx - hr * 0.4, cy - hr * 0.4, hr * 0.1, cx, cy, hr);
+    hg.addColorStop(0, hi); hg.addColorStop(0.6, lite); hg.addColorStop(1, dark);
+    ctx.fillStyle = hg; circle(ctx, cx, cy, hr);
+    ctx.lineWidth = Math.max(1, r * 0.05); ctx.strokeStyle = edge; ctx.beginPath(); ctx.arc(cx, cy, hr, 0, 6.28); ctx.stroke();
+    ctx.strokeStyle = hi; ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.arc(cx, cy, hr * 0.86, Math.PI * 1.05, Math.PI * 1.7); ctx.stroke(); ctx.globalAlpha = 1;
+    // engraved icon (embossed: darkbase + light top)
+    if (gdef.icon && gdef.icon !== "core") {
+      glyph(ctx, gdef.icon, cx, cy + Math.max(1, r * 0.04), hr * 1.02, "rgba(0,0,0,0.45)");
+      glyph(ctx, gdef.icon, cx, cy - Math.max(0.5, r * 0.02), hr * 1.02, shade(tint, 0.62));
+    } else {
+      // core: a central bolt hole with depth
+      ctx.fillStyle = edge; circle(ctx, cx, cy, hr * 0.4);
+      ctx.fillStyle = dark; circle(ctx, cx, cy, hr * 0.28);
+      ctx.fillStyle = hi; ctx.globalAlpha = 0.6; circle(ctx, cx - hr * 0.1, cy - hr * 0.1, hr * 0.1); ctx.globalAlpha = 1;
     }
 
     // art-style ring
     if (opts.graphicTint) {
       ctx.save(); ctx.lineWidth = 2.5; ctx.strokeStyle = opts.graphicTint;
-      ctx.beginPath(); ctx.arc(cx, cy, r + 3.5, 0, 6.28); ctx.stroke();
-      // little style pip
-      circle(ctx, cx + r * 0.9, cy - r * 0.9, 3, opts.graphicTint);
-      ctx.restore();
+      ctx.beginPath(); ctx.arc(cx, cy, r + 3, 0, 6.28); ctx.stroke();
+      circle(ctx, cx + r * 0.72, cy - r * 0.72, 2.6, opts.graphicTint); ctx.restore();
     }
 
     if (opts.jammed) {
@@ -241,7 +243,7 @@
   function gearThumb(cvs, gdef) {
     var ctx = cvs.getContext("2d"); ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, cvs.width, cvs.height);
-    gear(ctx, cvs.width / 2, cvs.height / 2, cvs.width * 0.34, gdef, 0.5, { eyes: true });
+    gear(ctx, cvs.width / 2, cvs.height * 0.46, cvs.width * 0.36, gdef, 0.5, {});
   }
 
   function graphicThumb(cvs, gd) {

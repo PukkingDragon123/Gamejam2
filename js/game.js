@@ -265,10 +265,17 @@
     if (type === "gears") pool = drawPool.filter(function (c) { return c.kind === "gear"; });
     else if (type === "graphics") pool = drawPool.filter(function (c) { return c.kind === "graphic"; });
     var cards = [], guard = 0;
+    function have(pk) { return cards.some(function (x) { return x.kind === pk.kind && x.id === pk.id; }); }
     while (cards.length < n && guard++ < 300) {
       var pk = pool[(Math.random() * pool.length) | 0];
       if (type === "pets" && pk.rarity === "common" && Math.random() < 0.6) continue; // pets skew rare
-      if (!cards.some(function (x) { return x.kind === pk.kind && x.id === pk.id; })) cards.push({ kind: pk.kind, id: pk.id, rarity: pk.rarity });
+      if (!have(pk)) cards.push({ kind: pk.kind, id: pk.id, rarity: pk.rarity });
+    }
+    // guarantee n cards even if the reroll loop starved
+    guard = 0;
+    while (cards.length < n && guard++ < 300) {
+      var pk2 = pool[(Math.random() * pool.length) | 0];
+      if (!have(pk2)) cards.push({ kind: pk2.kind, id: pk2.id, rarity: pk2.rarity });
     }
     return cards;
   }
@@ -817,28 +824,35 @@
     R.panel(ctx, L.inspector, "⚙ Inspector", "#ffd24d");
     R.panel(ctx, L.console, "> Console", "#8ee65a");
 
-    // board grid
+    // board grid — inset blueprint sockets
     for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
       var x = BX + c * CELL, y = BY + r * CELL, cell = G.board[r][c];
-      R.px(ctx, x + 2, y + 2, CELL - 4, CELL - 4, "#0f0c1a");
-      ctx.strokeStyle = "#2a2440"; ctx.lineWidth = 1; ctx.strokeRect(x + 2.5, y + 2.5, CELL - 5, CELL - 5);
+      R.fillRR(ctx, x + 3, y + 3, CELL - 6, CELL - 6, 4, "#0d0a08");         // socket well
+      ctx.strokeStyle = "#0a0806"; ctx.lineWidth = 1; ctx.strokeRect(x + 3.5, y + 3.5, CELL - 7, CELL - 7); // inset top-left dark
+      ctx.strokeStyle = "#3a2c1e"; ctx.beginPath(); ctx.moveTo(x + 3.5, y + CELL - 3.5); ctx.lineTo(x + CELL - 3.5, y + CELL - 3.5); ctx.lineTo(x + CELL - 3.5, y + 3.5); ctx.stroke(); // bottom-right light
+      if (!cell.gid) { ctx.save(); ctx.globalAlpha = 0.5; R.circle(ctx, x + CELL / 2, y + CELL / 2, 1.4, "#4a3728"); ctx.restore(); } // port dot
       var hov = G.hoverCell && G.hoverCell.c === c && G.hoverCell.r === r, cur = G.cursor;
       if (hov && cur) {
         var ok = (cur.mode === "place" && !cell.gid) || (cur.mode === "move" && !cell.gid) || (cur.mode === "graphic" && cell.gid);
-        var col = cur.mode === "graphic" ? "#5df0ff" : "#ffcf4d";
-        if (ok) { ctx.save(); ctx.globalAlpha = 0.18; R.px(ctx, x + 2, y + 2, CELL - 4, CELL - 4, col); ctx.restore(); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.strokeRect(x + 2.5, y + 2.5, CELL - 5, CELL - 5); }
+        var col = cur.mode === "graphic" ? "#6ee0ff" : "#ffca55";
+        if (ok) { ctx.save(); ctx.globalAlpha = 0.16; R.fillRR(ctx, x + 3, y + 3, CELL - 6, CELL - 6, 4, col); ctx.restore(); ctx.strokeStyle = col; ctx.lineWidth = 2; R.rr(ctx, x + 3.5, y + 3.5, CELL - 7, CELL - 7, 4); ctx.stroke(); }
       }
     }
-    // wires (with flowing energy pulses — factory feel)
-    ctx.save(); ctx.strokeStyle = "#4a3f6a"; ctx.lineWidth = 3; ctx.lineCap = "round";
-    G.score.wires.forEach(function (w) { var a = cellCenter(w[0], w[1]), b = cellCenter(w[2], w[3]); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }); ctx.restore();
-    var flowSpd = G.run ? 2.2 : 0.9;
+    // wires — insulated cables with a lit core + flowing energy
+    G.score.wires.forEach(function (w) {
+      var a = cellCenter(w[0], w[1]), b = cellCenter(w[2], w[3]);
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "#1c140d"; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.strokeStyle = "#5c4636"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.strokeStyle = "rgba(126,240,255,.25)"; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    });
+    var flowSpd = G.run ? 2.4 : 0.9;
     G.score.wires.forEach(function (w, wi) {
       var a = cellCenter(w[0], w[1]), b = cellCenter(w[2], w[3]);
       for (var pu = 0; pu < 2; pu++) {
         var frac = (t * flowSpd + wi * 0.31 + pu * 0.5) % 1;
         var px2 = a.x + (b.x - a.x) * frac, py = a.y + (b.y - a.y) * frac;
-        ctx.save(); ctx.globalAlpha = 0.85; R.circle(ctx, px2, py, 2.2, "#7ef0ff"); ctx.restore();
+        ctx.save(); ctx.globalAlpha = 0.5; R.circle(ctx, px2, py, 3, "#7ef0ff"); ctx.globalAlpha = 1; R.circle(ctx, px2, py, 1.4, "#eafcff"); ctx.restore();
       }
     });
     // gears (with place/score bounce)
