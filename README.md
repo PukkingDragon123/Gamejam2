@@ -20,22 +20,34 @@ python3 -m http.server 8000   # then open http://localhost:8000
 ```
 
 ### The loop, each day
-1. **Walk to your computer** (click it) to start the work session.
-2. **Open a booster pack** → pick **1 of 3** cards → wait for it to **install**.
-   Your collection grows across the jam.
+1. **Walk to your computer** (click it) and boot into **GearOS** — launch the
+   **GearEngine** app to start working.
+2. **Rip open a booster pack** → pick **1 of 3** cards → wait for it to
+   **install**. Packs are themed (mechanics / art / pets) and your collection
+   grows across the jam.
 3. In the **IDE**, click a gear in the **Asset Browser**, then an empty slot next
-   to the **CORE** to wire it in. Only gears **connected to the CORE** spin and
-   score. Paint gears with **art styles** for bonus points.
-4. The **countdown** is ticking. Hit **▶ RUN** to compile: your gears spin up and
-   rain **HYPE**. Beat the day's goal or you're out.
+   to the **CORE** to wire it in — energy flows down the wires like a little
+   factory. Only gears **connected to the CORE** score. Paint gears with **art
+   styles** for bonus points.
+4. The **countdown** is ticking. Hit **▶ RUN** to compile: gears spin up, points
+   rain, **combos** fire, and it all tallies into **HYPE**. Beat the day's goal
+   or you're out.
 5. At night, **pick an energy drink** — each refuels you but comes with a debuff.
 
 Reach **SUBMISSION DAY** and you win the jam. 🏆
 
 ## 🧮 Scoring — `HYPE = chips × mult`
-- **chips** (blue) + **mult** (pink) come from connected gears & art styles.
-- Two **touching, connected gears with the same art style** grant a big mult
-  bonus — consistent art direction pays off.
+- **chips** (blue) + **mult** (pink) come from connected gears, their **traits**,
+  and art styles. Multipliers apply last (Balatro-style).
+- Every gear has a **family** — Movement, Action, Content, System, Feel — and a
+  **trait** that reads your machine (e.g. JUMP `+2 chips per Movement gear`,
+  PROC-GEN `+2 mult per Content gear`, GAME JUICE `+2 mult per art style`).
+- **Adjacency** pays: touching connected gears of the same **art style** give
+  `+3 mult`; same **family** gives `+1 mult`.
+- **Combos** (Balatro "hands") fire when your machine qualifies and pop a banner:
+  `SPEEDRUN` (2+ Movement), `BULLET HELL` (2+ Action), `JUICE BAR` (2+ Feel),
+  `CONTENT FARM` (3+ Content), `ART DIRECTION` (3+ same style), `FULL STACK`
+  (all five families).
 - Coding drains **⚡ energy**; hit zero mid-code and you **pass out**.
 
 ## 🖼️ Using your own pixel art (`/assets`)
@@ -46,11 +58,12 @@ so you can add them one at a time.
 
 | File | What it is | Notes |
 |------|-----------|-------|
-| `assets/room.png` | Room background | Any 16:9 image. The computer/desk should sit on the **left** (see `CONFIG.room` in `js/data.js` to re-map the computer zone & walkable floor). |
-| `assets/player.png` | Player sprite sheet | **4 columns × 2 rows** grid. Frame order: `walkA, walkB, sit, back, drink, tired, cheer`. Ideally transparent (or a flat solid background that keys cleanly). |
-| `assets/drinks.png` | 5 drink sprites in a row | **Green-screen** background (auto-keyed out). Order: `cola, monster, beer, orange-juice, water`. |
-| `assets/pack_gears.png` | Mechanics booster pack | Single sprite. Flat/solid background keys out. |
+| `assets/room.gif` | Room background (animated) | Any 16:9 image/GIF; rendered as a layer behind the canvas so it keeps animating. Computer on the **left** (see `CONFIG.room` in `js/data.js`). `.png` also works. |
+| `assets/player.png` | Player sprite sheet | **4 columns × 2 rows** grid. Frame order: `walkA, walkB, sit, back, drink, tired, cheer`. Dark/solid backgrounds are flood-keyed to transparent per cell. |
+| `assets/drinks.png` | 5 drink sprites in a row | **Green-screen** background (auto-keyed). Order: `cola, monster, beer, orange-juice, water`. |
+| `assets/pack_gears.png` | Mechanics booster pack | Single sprite; solid background keyed out. |
 | `assets/pack_graphics.png` | Art booster pack | Single sprite. |
+| `assets/pack_pets.png` | Pets booster pack | Single sprite (a rarer "wildcard" pack). |
 
 Frame layout and the room's interactive zones are all configurable in
 `js/data.js` (`CONFIG.room`, `CONFIG.playerSheet`, `CONFIG.playerFrames`) — tweak
