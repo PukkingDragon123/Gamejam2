@@ -660,12 +660,198 @@
     boosterPack(ctx, cx, cy, targetH, t);
   }
 
+  // ============================================================
+  //  FIRST-PERSON TYPING GAME rendering
+  // ============================================================
+  var L = global.JamData.LAYOUT;
+
+  function screenRect() {
+    var s = L.screen;
+    return { x: s.x * W, y: s.y * H, w: s.w * W, h: s.h * H };
+  }
+
+  // ---- desk scene background ----
+  function deskScene(ctx) {
+    var A = AS();
+    if (A && A.has("desk")) { drawCover(ctx, A.get("desk"), 0, 0, W, H); return; }
+    // fallback: warm wall + desk + CRT
+    clear(ctx);
+    var wg = ctx.createLinearGradient(0, 0, 0, H); wg.addColorStop(0, "#3a2a22"); wg.addColorStop(1, "#241812");
+    ctx.fillStyle = wg; ctx.fillRect(0, 0, W, H);
+    px(ctx, 0, H * 0.62, W, H * 0.4, "#5a3d28");
+    var sr = screenRect();
+    fillRR(ctx, sr.x - 14, sr.y - 14, sr.w + 28, sr.h + 40, 10, "#cbcdbf");
+    fillRR(ctx, sr.x, sr.y, sr.w, sr.h, 6, "#0b140f");
+  }
+
+  // ---- code on the monitor ----
+  function monitorCode(ctx, target, typedLen, t, opts) {
+    opts = opts || {};
+    var r = screenRect();
+    ctx.save();
+    rr(ctx, r.x, r.y, r.w, r.h, 6); ctx.clip();
+    // screen
+    var sg = ctx.createRadialGradient(r.x + r.w / 2, r.y + r.h / 2, 4, r.x + r.w / 2, r.y + r.h / 2, r.w * 0.7);
+    sg.addColorStop(0, "#0e2018"); sg.addColorStop(1, "#081410");
+    ctx.fillStyle = sg; ctx.fillRect(r.x, r.y, r.w, r.h);
+    // scanlines
+    ctx.globalAlpha = 0.07; for (var sy = r.y; sy < r.y + r.h; sy += 3) px(ctx, r.x, sy, r.w, 1, "#8effc0"); ctx.globalAlpha = 1;
+
+    // header line (title bar)
+    ctx.font = "7px 'Courier New',monospace"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "#4a7a5c"; ctx.fillText("~/mygame/main.js", r.x + 8, r.y + 14);
+
+    // the code line, centred
+    var fs = Math.max(9, Math.min(15, r.w / (target.length * 0.62)));
+    ctx.font = fs + "px 'Courier New',monospace";
+    var totalW = ctx.measureText(target).width;
+    var startX = r.x + (r.w - totalW) / 2, baseY = r.y + r.h * 0.5;
+    var cx = startX;
+    for (var i = 0; i < target.length; i++) {
+      var ch = target[i], cw = ctx.measureText(ch).width;
+      if (i < typedLen) { ctx.fillStyle = "#9ff0b6"; ctx.fillText(ch, cx, baseY); }
+      else if (i === typedLen) {
+        // caret block
+        var blink = (Math.floor(t * 2) % 2) === 0;
+        if (blink) { ctx.fillStyle = "#ffd24d"; px(ctx, cx - 1, baseY - fs + 2, cw + 2, fs + 2, "#ffd24d"); }
+        ctx.fillStyle = blink ? "#241812" : "#ffd24d"; ctx.fillText(ch === " " ? "" : ch, cx, baseY);
+      } else { ctx.fillStyle = "#4f7a60"; ctx.fillText(ch, cx, baseY); }
+      cx += cw;
+    }
+    // progress ticks
+    ctx.fillStyle = "#2a4a38"; px(ctx, r.x + 8, r.y + r.h - 12, r.w - 16, 4, "#12281c");
+    var pf = target.length ? typedLen / target.length : 0;
+    px(ctx, r.x + 8, r.y + r.h - 12, (r.w - 16) * pf, 4, "#5fe0a0");
+
+    // mistake flash
+    if (opts.mistake > 0) { ctx.globalAlpha = Math.min(0.5, opts.mistake); ctx.fillStyle = "#ff4d4d"; ctx.fillRect(r.x, r.y, r.w, r.h); ctx.globalAlpha = 1; }
+    ctx.restore();
+    // green screen glow spill
+    ctx.save(); ctx.globalAlpha = 0.10 + 0.03 * Math.sin(t * 3); ctx.fillStyle = "#6effb0";
+    ctx.fillRect(r.x - 6, r.y - 6, r.w + 12, r.h + 12); ctx.restore();
+  }
+
+  // ---- interactive pixel keyboard ----
+  var _kb = null;
+  function keyboardLayout() {
+    if (_kb) return _kb;
+    var reg = { x: L.keyboard.x * W, y: L.keyboard.y * H, w: L.keyboard.w * W, h: L.keyboard.h * H };
+    var rows = global.JamData.KEYROWS, keys = [];
+    var gap = 2, kh = reg.h / rows.length - gap;
+    for (var r = 0; r < rows.length; r++) {
+      var y = reg.y + r * (kh + gap);
+      if (rows[r] === "_SPACE_") { var sw = reg.w * 0.5; keys.push({ label: "SPACE", char: " ", x: reg.x + (reg.w - sw) / 2, y: y, w: sw, h: kh }); continue; }
+      var chars = rows[r], n = chars.length, kw = reg.w / 10.5 - gap, rowW = n * (kw + gap) - gap, sx = reg.x + (reg.w - rowW) / 2;
+      for (var k = 0; k < n; k++) keys.push({ label: chars[k], char: chars[k], x: sx + k * (kw + gap), y: y, w: kw, h: kh });
+    }
+    _kb = { region: reg, keys: keys };
+    return _kb;
+  }
+  function keyForChar(ch) {
+    if (ch == null) return null;
+    var up = ch.length === 1 && ch >= "a" && ch <= "z" ? ch.toUpperCase() : ch;
+    var keys = keyboardLayout().keys;
+    for (var i = 0; i < keys.length; i++) if (keys[i].char === up || keys[i].char === ch) return keys[i];
+    return null;
+  }
+  function keyboard(ctx, opts) {
+    opts = opts || {};
+    var kb = keyboardLayout(), nextK = opts.next ? keyForChar(opts.next) : null, pressed = opts.pressed || {};
+    // base plate
+    var reg = kb.region;
+    fillRR(ctx, reg.x - 6, reg.y - 6, reg.w + 12, reg.h + 14, 6, "#241812");
+    fillRR(ctx, reg.x - 6, reg.y - 6, reg.w + 12, 4, 6, "#3a2a1e");
+    kb.keys.forEach(function (key) {
+      var down = pressed[key.char] > 0;
+      var isNext = nextK && nextK === key;
+      var top = down ? key.y + 2 : key.y;
+      // key side (depth)
+      fillRR(ctx, key.x, key.y + 2, key.w, key.h, 3, "#120b08");
+      // key cap
+      var capC = isNext ? "#3a3320" : "#2f261d";
+      var g = ctx.createLinearGradient(0, top, 0, top + key.h);
+      g.addColorStop(0, shade(capC, 0.5)); g.addColorStop(1, shade(capC, -0.2));
+      ctx.fillStyle = g; rr(ctx, key.x, top, key.w, key.h - (down ? 0 : 2), 3); ctx.fill();
+      // top highlight
+      ctx.globalAlpha = 0.4; px(ctx, key.x + 2, top + 2, key.w - 4, 2, "#efe0c8"); ctx.globalAlpha = 1;
+      if (isNext) { ctx.strokeStyle = "#ffd24d"; ctx.lineWidth = 1.5; rr(ctx, key.x + 0.5, top + 0.5, key.w - 1, key.h - 2, 3); ctx.stroke(); ctx.globalAlpha = 0.25 + 0.15 * Math.sin((opts.t || 0) * 8); ctx.fillStyle = "#ffd24d"; rr(ctx, key.x, top, key.w, key.h - 2, 3); ctx.fill(); ctx.globalAlpha = 1; }
+      // label
+      ctx.fillStyle = isNext ? "#ffe9a8" : "#b8a48e"; ctx.font = "6px 'Courier New',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(key.label === "SPACE" ? "" : key.label, key.x + key.w / 2, top + key.h / 2);
+    });
+    ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  }
+
+  // ---- first-person hands ----
+  function handsSprite(ctx, frameIndex, cx, t, opts) {
+    opts = opts || {};
+    var A = AS(), bob = Math.sin(t * (opts.fast ? 9 : 2.4)) * (opts.bobAmt || 3);
+    var tap = opts.tap || 0;
+    var yBottom = H + H * 0.06 - tap;         // wrists just off the bottom
+    if (A && A.has("hands")) {
+      var cv = A.frame("hands", frameIndex);
+      if (cv) { var targetH = H * (opts.scale || 0.62); drawSpriteBottom(ctx, cv, cx, yBottom + bob, targetH); return; }
+    }
+    // fallback: two rounded blobs
+    circle(ctx, cx - 30, H - 20 + bob, 22, "#f0c896"); circle(ctx, cx + 30, H - 20 + bob, 22, "#f0c896");
+  }
+  function drawSpriteBottom(ctx, cv, cx, bottomY, targetH) {
+    var s = targetH / cv.height, dw = cv.width * s;
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(cv, cx - dw / 2, bottomY - targetH, dw, targetH);
+  }
+
+  // ---- red RUN button ----
+  function runButton(ctx, cx, cy, targetH, pressed, t) {
+    var A = AS();
+    if (A && A.has("runbtn")) {
+      var cv = A.frame("runbtn", pressed ? 1 : 0);
+      if (cv) { var s = targetH / cv.height; ctx.imageSmoothingEnabled = false; ctx.drawImage(cv, cx - cv.width * s / 2, cy - targetH / 2 + (pressed ? targetH * 0.05 : 0), cv.width * s, targetH); return; }
+    }
+    // fallback
+    circle(ctx, cx, cy + 6, targetH * 0.4, "#5a3a24");
+    circle(ctx, cx, cy - (pressed ? 0 : 4), targetH * 0.34, pressed ? "#c8324a" : "#ff5d5d");
+  }
+
+  // ---- upgrade icons (pixel) ----
+  function upgradeIcon(ctx, key, cx, cy, s) {
+    ctx.save();
+    switch (key) {
+      case "kb":
+        fillRR(ctx, cx - s * 0.5, cy - s * 0.3, s, s * 0.6, 2, "#3a3020");
+        for (var i = 0; i < 4; i++) for (var j = 0; j < 2; j++) px(ctx, cx - s * 0.4 + i * s * 0.24, cy - s * 0.2 + j * s * 0.22, s * 0.16, s * 0.14, "#c9b98f");
+        break;
+      case "mega":
+        ctx.fillStyle = "#ffca55"; ctx.beginPath(); ctx.moveTo(cx - s * 0.5, cy - s * 0.22); ctx.lineTo(cx + s * 0.1, cy - s * 0.42); ctx.lineTo(cx + s * 0.1, cy + s * 0.42); ctx.lineTo(cx - s * 0.5, cy + s * 0.22); ctx.closePath(); ctx.fill();
+        px(ctx, cx - s * 0.6, cy - s * 0.16, s * 0.12, s * 0.32, "#3a2a1a");
+        star(ctx, cx + s * 0.4, cy - s * 0.3, s * 0.14, "#fff"); break;
+      case "rocket":
+        ctx.fillStyle = "#e8e6f0"; fillRR(ctx, cx - s * 0.16, cy - s * 0.5, s * 0.32, s * 0.8, s * 0.16, "#e8e6f0");
+        circle(ctx, cx, cy - s * 0.2, s * 0.1, "#5df0ff");
+        ctx.fillStyle = "#ff7a4d"; ctx.beginPath(); ctx.moveTo(cx - s * 0.16, cy + s * 0.3); ctx.lineTo(cx, cy + s * 0.55); ctx.lineTo(cx + s * 0.16, cy + s * 0.3); ctx.fill(); break;
+      case "coffee":
+        fillRR(ctx, cx - s * 0.34, cy - s * 0.24, s * 0.6, s * 0.5, 3, "#e8e2d4");
+        px(ctx, cx - s * 0.28, cy - s * 0.18, s * 0.48, s * 0.14, "#6a3a1a");
+        px(ctx, cx + s * 0.26, cy - s * 0.14, s * 0.12, s * 0.24, "#e8e2d4"); break;
+      default: circle(ctx, cx, cy, s * 0.3, "#ffca55");
+    }
+    ctx.restore();
+  }
+
+  function vignette(ctx) {
+    var g = ctx.createRadialGradient(W / 2, H * 0.5, H * 0.35, W / 2, H * 0.5, H * 0.85);
+    g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,0.45)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+
   global.JamRender = {
     W: W, H: H, HOTSPOTS: HOTSPOTS,
     clear: clear, px: px, circle: circle, rr: rr, fillRR: fillRR, shade: shade, glyph: glyph, star: star,
     gear: gear, gearThumb: gearThumb, graphicThumb: graphicThumb,
     drinkCan: drinkCan, boosterPack: boosterPack, character: character,
     room: room, panel: panel,
-    roomScene: roomScene, playerSprite: playerSprite, drinkSprite: drinkSprite, packSprite: packSprite, packRip: packRip
+    roomScene: roomScene, playerSprite: playerSprite, drinkSprite: drinkSprite, packSprite: packSprite, packRip: packRip,
+    screenRect: screenRect, deskScene: deskScene, monitorCode: monitorCode,
+    keyboardLayout: keyboardLayout, keyForChar: keyForChar, keyboard: keyboard,
+    handsSprite: handsSprite, runButton: runButton, upgradeIcon: upgradeIcon, vignette: vignette
   };
 })(window);

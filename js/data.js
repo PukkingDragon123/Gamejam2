@@ -12,17 +12,23 @@
 (function (global) {
   "use strict";
 
-  // ---- shared canvas + IDE layout (used by render + game) ----
+  // ---- shared canvas layout (4:3 to match the desk scene) ----
   var LAYOUT = {
-    W: 640, H: 360,
-    toolbar: { x: 0, y: 0, w: 640, h: 30 },
-    nodePanel: { x: 8, y: 34, w: 420, h: 262 },
-    inspector: { x: 434, y: 34, w: 198, h: 262 },
-    console: { x: 8, y: 300, w: 624, h: 52 },
-    // gear board (inside nodePanel)
-    cols: 6, rows: 5, cell: 48, bx: 74, by: 56,
-    coreCell: { c: 2, r: 2 }
+    W: 512, H: 384,
+    // monitor screen region on the desk image (normalized 0..1)
+    screen: { x: 0.255, y: 0.135, w: 0.375, h: 0.40 },
+    // on-screen keyboard region (normalized)
+    keyboard: { x: 0.05, y: 0.70, w: 0.90, h: 0.20 }
   };
+
+  // Interactive keyboard rows (labels). SPACE handled specially.
+  var KEYROWS = [
+    "1234567890",
+    "QWERTYUIOP",
+    "ASDFGHJKL",
+    "ZXCVBNM",
+    "_SPACE_"
+  ];
 
   /* ---------------------------------------------------------
      GEARS
@@ -193,8 +199,49 @@
     { id:"run",     text:"When you're ready, hit ▶ RUN to compile: your gears spin up and rain points. Reach the goal to survive the day!", advance:"ran", anchor:{ sel:"#btn-run" } }
   ];
 
+  /* =========================================================
+     FIRST-PERSON TYPING GAME content
+     ========================================================= */
+  // Code lines to type. Roughly increasing length/difficulty.
+  var SNIPPETS = [
+    "player.jump();",
+    "score += 10;",
+    "if (hp <= 0) die();",
+    "load('hero.png');",
+    "spawn(enemy, x, y);",
+    "camera.shake(4);",
+    "for (i=0; i<8; i++)",
+    "player.x += speed;",
+    "combo = combo * 2;",
+    "return win ? 1 : 0;",
+    "function update(dt) {",
+    "sfx.play('coin');",
+    "if (jump && grounded)",
+    "tiles[y][x] = wall;",
+    "vel.y += gravity * dt;"
+  ];
+
+  // Cookie-clicker upgrades. cost = base * 1.6^owned. icon drawn in render.
+  var UPGRADES = [
+    { id: "autocomplete", name: "Auto-Complete", icon: "kb",     base: 20, desc: "Snippets start partly typed." },
+    { id: "marketing",    name: "Marketing",     icon: "mega",   base: 35, desc: "+players every second." },
+    { id: "viral",        name: "Viral Hit",     icon: "rocket", base: 60, desc: "+50% players per game shipped." },
+    { id: "coffee",       name: "Cold Brew",     icon: "coffee", base: 45, desc: "The deadline clock ticks slower." }
+  ];
+
+  var GAME = {
+    shipTarget: 100,       // mash amount to ship
+    mashPerHit: 8,         // build filled per button press
+    mashDecay: 9,          // build lost per second (keeps you mashing)
+    basePlayersPerSec: 0.1
+  };
+
   global.JamData = {
     LAYOUT: LAYOUT,
+    KEYROWS: KEYROWS,
+    SNIPPETS: SNIPPETS,
+    UPGRADES: UPGRADES,
+    GAME: GAME,
     GEARS: GEARS,
     TYPES: TYPES,
     COMBOS: COMBOS,
