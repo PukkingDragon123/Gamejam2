@@ -237,9 +237,9 @@
       overlay(html);
       var pc = document.getElementById("pack-cv");
       var pctx = pc.getContext("2d"); pctx.imageSmoothingEnabled = false;
-      G._packAnim = { cv: pc, ctx: pctx, type: packType };
+      G._packAnim = { cv: pc, ctx: pctx, type: packType, ripping: false, ripStart: null, done: false };
       pc.style.cursor = "pointer";
-      pc.onclick = function () { A.sfx.packOpen(); tut("pack"); renderPackOverlay(true, packType); };
+      pc.onclick = function () { if (G._packAnim.ripping) return; G._packAnim.ripping = true; A.sfx.packOpen(); shake(6); tut("pack"); };
     } else {
       html += '<h1>✨ PICK ONE</h1><p class="lead">Choose a card to install. Rarer cards are stronger.</p><div class="pack-cards" id="pack-cards"></div></div>';
       overlay(html);
@@ -716,10 +716,13 @@
       // ambient behind modals: gif shows through a cleared canvas, else fallback
       if (G.roomOk) R.clear(ctx); else R.roomScene(ctx, t, {});
     }
-    // pack preview animation (procedural fallback only; asset packs animate in overlay)
+    // pack idle-bob + tearing-open animation on the overlay canvas
     if (G.state === "pack" && G._packAnim && G._packAnim.cv && document.body.contains(G._packAnim.cv)) {
       var pa = G._packAnim; pa.ctx.clearRect(0, 0, pa.cv.width, pa.cv.height);
-      R.packSprite(pa.ctx, pa.type, pa.cv.width / 2, pa.cv.height / 2, pa.cv.height * 0.92, t);
+      var rip = 0;
+      if (pa.ripping) { if (pa.ripStart == null) pa.ripStart = t; rip = Math.min(1, (t - pa.ripStart) / 0.55); }
+      R.packRip(pa.ctx, pa.type, pa.cv.width / 2, pa.cv.height / 2, pa.cv.height * 0.9, rip, t);
+      if (pa.ripping && rip >= 1 && !pa.done) { pa.done = true; A.sfx.cash(); renderPackOverlay(true, pa.type); }
     }
   }
 
@@ -746,22 +749,22 @@
 
   function renderBuild(t) {
     R.clear(ctx);
-    var g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#1a1420"); g.addColorStop(1, "#120d16");
+    var g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#201811"); g.addColorStop(1, "#160f0a");
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 
     ctx.save();
     if (G.shake) ctx.translate((Math.random() - 0.5) * G.shake, (Math.random() - 0.5) * G.shake);
 
     // toolbar
-    R.px(ctx, 0, 0, W, 30, "#1b1730");
-    ctx.fillStyle = "#c8c3e0"; ctx.font = "9px 'Courier New',monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    R.px(ctx, 0, 0, W, 30, "#2a1f16");
+    ctx.fillStyle = "#e4d6c2"; ctx.font = "9px 'Courier New',monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
     ctx.fillText("GearEngine ▸ MyGame.gjam", 10, 15);
-    ["File", "Edit", "Build", "Help"].forEach(function (m, i) { ctx.fillStyle = "#7a7398"; ctx.fillText(m, 170 + i * 40, 15); });
+    ["File", "Edit", "Build", "Help"].forEach(function (m, i) { ctx.fillStyle = "#9c8a70"; ctx.fillText(m, 170 + i * 40, 15); });
     // REC dot
     var recOn = G.clockRunning && !G.tutActive;
-    ctx.fillStyle = recOn ? (Math.floor(t * 2) % 2 ? "#ff3355" : "#7a2233") : "#4a4460";
+    ctx.fillStyle = recOn ? (Math.floor(t * 2) % 2 ? "#ff5544" : "#7a2f22") : "#5a4636";
     R.circle(ctx, W - 88, 15, 4, ctx.fillStyle);
-    ctx.fillStyle = "#c8c3e0"; ctx.fillText(G.run ? "compiling…" : (recOn ? "REC" : "paused"), W - 78, 15);
+    ctx.fillStyle = "#e4d6c2"; ctx.fillText(G.run ? "compiling…" : (recOn ? "REC" : "paused"), W - 78, 15);
     ctx.textBaseline = "alphabetic";
 
     // panels

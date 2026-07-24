@@ -4,19 +4,19 @@
    ========================================================= */
 
 :root{
-  --bg:        #12101c;
-  --panel:     #1e1a2e;
-  --panel-2:   #272138;
-  --ink:       #e8e6f0;
-  --ink-dim:   #9a93b8;
-  --line:      #453b66;
-  --accent:    #ffd23f;  /* hype yellow */
-  --time:      #4fd9b0;  /* green */
-  --energy:    #ff5d8f;   /* pink */
-  --hype:      #ff8a3d;   /* orange */
-  --good:      #6ee7ff;
-  --bad:       #ff5555;
-  --shadow:    0 4px 0 rgba(0,0,0,.45);
+  --bg:        #17110b;   /* warm dark */
+  --panel:     #241a12;   /* cozy brown */
+  --panel-2:   #30231a;
+  --ink:       #f3e9da;   /* warm cream */
+  --ink-dim:   #b8a48e;
+  --line:      #5c4636;   /* wood */
+  --accent:    #ffca55;  /* amber */
+  --time:      #7bd88a;  /* green */
+  --energy:    #ff7a9c;   /* warm pink */
+  --hype:      #ff9a4d;   /* orange */
+  --good:      #6ee0ff;
+  --bad:       #ff6a5a;
+  --shadow:    0 4px 0 rgba(0,0,0,.5);
 }
 
 *{ box-sizing:border-box; margin:0; padding:0; }
@@ -25,7 +25,7 @@ html,body{ height:100%; }
 
 body{
   background:
-    radial-gradient(1200px 600px at 50% -10%, #241f38 0%, var(--bg) 60%);
+    radial-gradient(1200px 600px at 50% -10%, #3a2a1c 0%, var(--bg) 60%);
   color:var(--ink);
   font-family: "Courier New", ui-monospace, monospace;
   font-weight:700;

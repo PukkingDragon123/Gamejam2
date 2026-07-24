@@ -507,15 +507,15 @@
 
   // -------------------------------------------------- IDE panel frame
   function panel(ctx, r, title, accent) {
-    fillRR(ctx, r.x, r.y, r.w, r.h, 4, "#181528");
-    px(ctx, r.x, r.y, r.w, 16, "#241f38");
-    fillRR(ctx, r.x, r.y, r.w, 16, 4, "#241f38"); px(ctx, r.x, r.y + 8, r.w, 8, "#241f38");
-    circle(ctx, r.x + 8, r.y + 8, 2.5, accent || "#ff5d8f");
-    circle(ctx, r.x + 16, r.y + 8, 2.5, "#ffd24d");
-    circle(ctx, r.x + 24, r.y + 8, 2.5, "#8ee65a");
-    ctx.fillStyle = "#c8c3e0"; ctx.font = "8px 'Courier New',monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    fillRR(ctx, r.x, r.y, r.w, r.h, 4, "#1c140d");
+    px(ctx, r.x, r.y, r.w, 16, "#2c2016");
+    fillRR(ctx, r.x, r.y, r.w, 16, 4, "#2c2016"); px(ctx, r.x, r.y + 8, r.w, 8, "#2c2016");
+    circle(ctx, r.x + 8, r.y + 8, 2.5, accent || "#ff7a9c");
+    circle(ctx, r.x + 16, r.y + 8, 2.5, "#ffca55");
+    circle(ctx, r.x + 24, r.y + 8, 2.5, "#7bd88a");
+    ctx.fillStyle = "#e4d6c2"; ctx.font = "8px 'Courier New',monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
     ctx.fillText(title, r.x + 34, r.y + 8);
-    ctx.strokeStyle = "#332b4e"; ctx.lineWidth = 1; rr(ctx, r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1, 4); ctx.stroke();
+    ctx.strokeStyle = "#4a3928"; ctx.lineWidth = 1; rr(ctx, r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1, 4); ctx.stroke();
     ctx.textBaseline = "alphabetic";
   }
 
@@ -603,6 +603,44 @@
     drinkCan(ctx, cx, cy, targetH, drink);
   }
 
+  // ---- pack tearing open (rip 0..1) ----
+  function packRip(ctx, type, cx, cy, targetH, rip, t) {
+    var A = AS();
+    var name = type === "graphics" ? "pack_graphics" : (type === "pets" ? "pack_pets" : "pack_gears");
+    var img = (A && A.has(name)) ? A.get(name) : null;
+    var bob = rip <= 0 ? Math.sin(t * 3) * 3 : 0;
+    if (!img) { boosterPack(ctx, cx + (rip > 0 ? (Math.random() - 0.5) * 5 : 0), cy + bob, targetH, t); }
+    else {
+      var s = targetH / img.height, dw = img.width * s, dh = targetH;
+      var tearY = img.height * 0.40;                 // tear just below the crimped top
+      var sep = rip * dh * 0.55;
+      var jitter = rip > 0 ? (Math.random() - 0.5) * 4 * rip : 0;
+      ctx.save(); ctx.imageSmoothingEnabled = false;
+      // bottom half (draw first, behind)
+      ctx.drawImage(img, 0, tearY, img.width, img.height - tearY, cx - dw / 2 + jitter, cy - dh / 2 + tearY * s + sep, dw, (img.height - tearY) * s);
+      // top strip (the ripped-off lid), flies up + tilts
+      ctx.save(); ctx.translate(cx, cy - dh / 2 - sep); ctx.rotate(-rip * 0.15);
+      ctx.drawImage(img, 0, 0, img.width, tearY, -dw / 2 + jitter, -bob, dw, tearY * s);
+      ctx.restore();
+      // torn foil glint along the tear
+      if (rip > 0 && rip < 1) {
+        ctx.globalAlpha = 1 - rip; ctx.fillStyle = "#fff";
+        for (var j = 0; j < dw; j += 6) px(ctx, cx - dw / 2 + j, cy - dh / 2 + tearY * s - 2 + (j % 12 ? 0 : 2), 4, 3, "#fff");
+      }
+      ctx.restore();
+    }
+    // sparkle burst
+    if (rip > 0 && rip < 1) {
+      var nsp = 10;
+      for (var i = 0; i < nsp; i++) {
+        var a = (i / nsp) * 6.28, rad = rip * targetH * 0.7;
+        ctx.globalAlpha = 1 - rip;
+        star(ctx, cx + Math.cos(a) * rad, cy - targetH * 0.1 + Math.sin(a) * rad * 0.7, 2 + (1 - rip) * 2, i % 2 ? "#ffd24d" : "#5df0ff");
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
   // ---- booster pack (image if available, else procedural) ----
   function packSprite(ctx, type, cx, cy, targetH, t) {
     var A = AS();
@@ -626,6 +664,6 @@
     gear: gear, gearThumb: gearThumb, graphicThumb: graphicThumb,
     drinkCan: drinkCan, boosterPack: boosterPack, character: character,
     room: room, panel: panel,
-    roomScene: roomScene, playerSprite: playerSprite, drinkSprite: drinkSprite, packSprite: packSprite
+    roomScene: roomScene, playerSprite: playerSprite, drinkSprite: drinkSprite, packSprite: packSprite, packRip: packRip
   };
 })(window);
