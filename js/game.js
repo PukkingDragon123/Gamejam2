@@ -193,8 +193,53 @@
 
   function beginWork() {
     G.player.sitting = true;
+    openDesktop();
+  }
+
+  function launchEngine() {
+    hideOverlay();
     if (G.packsLeft > 0) startPack();
     else enterBuild();
+  }
+
+  // A little retro OS you boot into when you sit at the computer.
+  function openDesktop() {
+    G.state = "desktop"; applyChrome();
+    var apps = [
+      { id: "engine", icon: "🛠️", name: "GearEngine", accent: "#ffca55" },
+      { id: "assets", icon: "📦", name: "Assets", accent: "#6ee0ff" },
+      { id: "net", icon: "🌐", name: "GameJamNet", accent: "#7bd88a" },
+      { id: "trash", icon: "🗑️", name: "Recycle", accent: "#b8a48e" }
+    ];
+    var icons = apps.map(function (a) {
+      return '<button class="dk-icon" data-app="' + a.id + '"><span class="dk-emoji">' + a.icon + '</span><span class="dk-label">' + a.name + '</span></button>';
+    }).join("");
+    overlay('<div class="desktop">' +
+      '<div class="dk-wall"><div class="dk-logo">GearOS<span>95</span></div>' +
+      '<div class="dk-icons">' + icons + '</div></div>' +
+      '<div class="dk-taskbar"><button class="dk-start">▚ Start</button>' +
+      '<span class="dk-hint">Open <b>GearEngine</b> to build your game →</span>' +
+      '<span class="dk-clock">Day ' + (G.day + 1) + '  ◷ late</span></div>' +
+      '<div id="dk-window" class="dk-window hidden"></div></div>');
+    var wrap = els.overlay.querySelector(".desktop");
+    wrap.querySelectorAll(".dk-icon").forEach(function (btn) {
+      btn.onclick = function () { A.sfx.ui(); onDesktopApp(btn.getAttribute("data-app")); };
+    });
+    wrap.querySelector(".dk-start").onclick = function () { A.sfx.ui(); onDesktopApp("engine"); };
+  }
+
+  function onDesktopApp(id) {
+    if (id === "engine") { A.sfx.select(); launchEngine(); return; }
+    var win = document.getElementById("dk-window");
+    var owned = Object.keys(G.inventory.gears).length + Object.keys(G.inventory.graphics).length;
+    var body = {
+      assets: "📦 Installed assets: <b>" + owned + "</b> types.<br>Your gears &amp; art live inside GearEngine — open it to build.",
+      net: "🌐 <b>GameJamNet</b><br>“day 1 and someone already has a vertical slice???”<br>“my game is just a cube. send help.”<br><i>(do NOT read the comments.)</i>",
+      trash: "🗑️ <b>Recycle Bin</b><br>0 items. You never delete anything. That's the problem."
+    }[id] || "…";
+    win.innerHTML = '<div class="dk-titlebar"><span>' + id + '.exe</span><button class="dk-x">✕</button></div><div class="dk-body">' + body + '</div>';
+    win.classList.remove("hidden");
+    win.querySelector(".dk-x").onclick = function () { win.classList.add("hidden"); };
   }
 
   // =========================================================
@@ -980,7 +1025,7 @@
   // =========================================================
   function applyChrome() {
     var s = G.state;
-    els.hud.classList.toggle("hidden", s === "title");
+    els.hud.classList.toggle("hidden", s === "title" || s === "desktop");
     els.tray.classList.toggle("hidden", !(s === "build" || s === "run"));
     if (!(s === "room" || s === "build")) { els.status.classList.add("hidden"); }
     if (s !== "build") dismissTut();
