@@ -12,12 +12,17 @@
 
   var store = {}, meta = {};
 
+  // Files are pre-baked to transparent backgrounds (see scratch/bake), so no
+  // runtime keying is needed — just load and (for sheets) slice.
   var MANIFEST = [
-    { name: "player",        src: "assets/player.png",        sheet: { cols: 4, rows: 2 }, key: "corner", tol: 72 },
-    { name: "drinks",        src: "assets/drinks.png",        sheet: { cols: 5, rows: 1 }, key: "green" },
-    { name: "pack_gears",    src: "assets/pack_gears.png",    key: "corner", tol: 46 },
-    { name: "pack_graphics", src: "assets/pack_graphics.png", key: "corner", tol: 46 },
-    { name: "pack_pets",     src: "assets/pack_pets.png",     key: "corner", tol: 46 }
+    { name: "hands",         src: "assets/hands.png",         sheet: { cols: 3, rows: 1 } }, // 0 idle,1 press,2 type
+    { name: "runbtn",        src: "assets/runbtn.png",        sheet: { cols: 2, rows: 1 } }, // 0 up,1 down
+    { name: "desk",          src: "assets/desk.png" },
+    { name: "player",        src: "assets/player.png",        sheet: { cols: 4, rows: 2 } },
+    { name: "drinks",        src: "assets/drinks.png",        sheet: { cols: 5, rows: 1 } },
+    { name: "pack_gears",    src: "assets/pack_gears.png" },
+    { name: "pack_graphics", src: "assets/pack_graphics.png" },
+    { name: "pack_pets",     src: "assets/pack_pets.png" }
   ];
 
   function toCanvas(img) {
