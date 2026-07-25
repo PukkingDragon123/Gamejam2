@@ -67,11 +67,16 @@
   }
 
   function onDown(e) {
+    if (e.cancelable) e.preventDefault();
     var p = toXY(e);
     if (G.state === "code") {
-      // clicking an on-screen key types it (touch friendly)
+      // tapping an on-screen key types it (this is the mobile/touch input path)
       var keys = R.keyboardLayout().keys;
-      for (var i = 0; i < keys.length; i++) { var k = keys[i]; if (p.x >= k.x && p.x <= k.x + k.w && p.y >= k.y && p.y <= k.y + k.h) { typeChar(k.char); return; } }
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        // generous hit box for fingers
+        if (p.x >= k.x - 2 && p.x <= k.x + k.w + 2 && p.y >= k.y - 2 && p.y <= k.y + k.h + 4) { typeChar(k.char); return; }
+      }
     } else if (G.state === "ship") {
       mash();
     }
@@ -251,7 +256,8 @@
     if (G.state === "code") {
       R.monitorCode(ctx, G.target, G.typedLen, t, { mistake: Math.max(0, G.mistakeFlash) });
       R.keyboard(ctx, { next: G.target[G.typedLen], pressed: G.pressed, t: t });
-      R.handsSprite(ctx, 2, W / 2, t, { scale: 0.6, tap: G.handTap * 90, bobAmt: 2.5 });
+      R.handsSprite(ctx, 2, W / 2, t, { scale: 0.55, tap: G.handTap * 90, bobAmt: 2.5 });
+      R.keyGlow(ctx, G.target[G.typedLen], t);   // shown over the hands so you always see the next key
       bigClock(t);
       hud();
     } else if (G.state === "ship") {

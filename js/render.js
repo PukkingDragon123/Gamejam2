@@ -763,7 +763,7 @@
     fillRR(ctx, reg.x - 10, reg.y - 9, reg.w + 20, reg.h + 20, 8, "#2a1d13");
     fillRR(ctx, reg.x - 7, reg.y - 7, reg.w + 14, reg.h + 15, 7, "#6a5136");
     fillRR(ctx, reg.x - 7, reg.y - 7, reg.w + 14, 5, 7, "#8a6f4a");
-    var depth = 5;
+    var depth = 8;
     kb.keys.forEach(function (key) {
       var down = pressed[key.char] > 0 ? depth - 1 : 0;
       var isNext = nextK && nextK === key;
@@ -847,6 +847,22 @@
     ctx.restore();
   }
 
+  // floating "type this next" indicator, drawn over the hands
+  function keyGlow(ctx, char, t) {
+    var k = keyForChar(char); if (!k) return;
+    var cx = k.x + k.w / 2;
+    var ay = k.y - 11 - Math.abs(Math.sin(t * 7)) * 5;
+    ctx.save();
+    // ring on the key
+    ctx.globalAlpha = 0.55 + 0.2 * Math.sin(t * 8); ctx.strokeStyle = "#ffca55"; ctx.lineWidth = 2.5;
+    rr(ctx, k.x - 1, k.y - 1, k.w + 2, k.h + 2, 5); ctx.stroke();
+    ctx.globalAlpha = 1;
+    // bouncing arrow above
+    ctx.fillStyle = "#ffd24d"; ctx.beginPath(); ctx.moveTo(cx - 6, ay); ctx.lineTo(cx + 6, ay); ctx.lineTo(cx, ay + 7); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "#7a4a12"; ctx.lineWidth = 1; ctx.stroke();
+    ctx.restore();
+  }
+
   // little pixel "players" icon (two folks)
   function peopleIcon(ctx, cx, cy, s) {
     var folks = [[-s * 0.26, "#6ee0ff"], [s * 0.26, "#ffca55"]];
@@ -874,6 +890,6 @@
     roomScene: roomScene, playerSprite: playerSprite, drinkSprite: drinkSprite, packSprite: packSprite, packRip: packRip,
     screenRect: screenRect, deskScene: deskScene, monitorCode: monitorCode,
     keyboardLayout: keyboardLayout, keyForChar: keyForChar, keyboard: keyboard,
-    handsSprite: handsSprite, runButton: runButton, upgradeIcon: upgradeIcon, peopleIcon: peopleIcon, vignette: vignette
+    handsSprite: handsSprite, runButton: runButton, upgradeIcon: upgradeIcon, peopleIcon: peopleIcon, keyGlow: keyGlow, vignette: vignette
   };
 })(window);

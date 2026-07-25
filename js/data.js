@@ -17,16 +17,19 @@
     W: 512, H: 384,
     // monitor screen region on desk.png (normalized) — fits inside the CRT glass
     screen: { x: 0.29, y: 0.20, w: 0.278, h: 0.325 },
-    // on-screen keyboard region (normalized) — taller for fat keycaps
-    keyboard: { x: 0.045, y: 0.665, w: 0.91, h: 0.245 }
+    // on-screen keyboard region (normalized) — big & chunky
+    keyboard: { x: 0.035, y: 0.60, w: 0.93, h: 0.335 }
   };
 
   // Interactive keyboard rows (labels). SPACE handled specially.
+  // Includes a symbol row so EVERY character in a snippet is tappable
+  // (this is what makes typing work on mobile / touch).
   var KEYROWS = [
     "1234567890",
     "QWERTYUIOP",
     "ASDFGHJKL",
     "ZXCVBNM",
+    ".,()=+-;",
     "_SPACE_"
   ];
 
@@ -203,22 +206,24 @@
      FIRST-PERSON TYPING GAME content
      ========================================================= */
   // Code lines to type. Roughly increasing length/difficulty.
+  // Only letters, digits, space, and the on-screen symbol keys ( . , ( ) = + - ; )
+  // so every character is tappable on touch devices.
   var SNIPPETS = [
     "player.jump();",
-    "score += 10;",
-    "if (hp <= 0) die();",
-    "load('hero.png');",
+    "score = score + 10;",
+    "hp = hp - 1;",
     "spawn(enemy, x, y);",
+    "load(hero.png);",
     "camera.shake(4);",
-    "for (i=0; i<8; i++)",
-    "player.x += speed;",
-    "combo = combo * 2;",
-    "return win ? 1 : 0;",
-    "function update(dt) {",
-    "sfx.play('coin');",
-    "if (jump && grounded)",
-    "tiles[y][x] = wall;",
-    "vel.y += gravity * dt;"
+    "combo = combo + 1;",
+    "player.x = 100;",
+    "update(dt);",
+    "sfx.play(coin);",
+    "grounded = true;",
+    "gravity = 9;",
+    "level = level + 1;",
+    "player.hp = 100;",
+    "reset(game);"
   ];
 
   // Cookie-clicker upgrades. cost = base * 1.6^owned. icon drawn in render.
