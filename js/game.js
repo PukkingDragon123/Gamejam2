@@ -175,7 +175,8 @@
     R.contactShadow(ctx, pl.x, pl.feetY, 18, hop * 5);
     // rim light so the character reads clearly against the dark room
     ctx.save(); ctx.globalAlpha = 0.30; R.lightPool(ctx, pl.x, pl.feetY - hgt * 0.45, hgt * 0.75, "#ffd9a0", 0.30); ctx.restore();
-    R.playerSprite(ctx, frame, pl.x, pl.feetY - hop * 4 + breathe, hgt * (1 + hop * 0.02), pl.facing === 1, t, "");
+    // feet nudged down onto the shadow; never mirrored (the flip looked bad)
+    R.playerSprite(ctx, frame, pl.x, pl.feetY + hgt * 0.06 - hop * 4 + breathe, hgt * (1 + hop * 0.02), false, t, "");
     // prompt
     if (hover || Math.abs(pl.x - R.roomMap(ROOM.standX, 0).x) < 40) {
       ctx.save(); ctx.textAlign = "center";
@@ -571,7 +572,7 @@
     var hop = Math.abs(Math.sin(t * 6)), bob = -hop * 8;
     ctx.save(); ctx.globalAlpha = 0.28 - hop * 0.14; ctx.beginPath(); ctx.ellipse(x, feetY, 15 - hop * 4, 4.5, 0, 0, 6.28); ctx.fillStyle = "#000"; ctx.fill(); ctx.restore();
     var frame = (Math.floor(t * 6) % 2) ? "walkB" : "walkA";
-    R.playerSprite(ctx, frame, x, feetY + bob, rr.h * ROOM.scale, true, t, "");
+    R.playerSprite(ctx, frame, x, feetY + rr.h * ROOM.scale * 0.06 + bob, rr.h * ROOM.scale, false, t, "");
   }
 
   // =========================================================

@@ -677,7 +677,9 @@
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
     var A = AS();
     if (A && A.has("room")) {
-      var img = A.get("room"), s = Math.min(W / img.width, H / img.height);
+      // drawing the LIVE <img> each frame keeps the GIF animating
+      var img = A.get("room");
+      var s = Math.max(W / img.width, H / img.height);          // cover: fill the screen
       var dw = img.width * s, dh = img.height * s, dx = (W - dw) / 2, dy = (H - dh) / 2;
       ctx.imageSmoothingEnabled = false; ctx.drawImage(img, dx, dy, dw, dh);
       _roomRect = { x: dx, y: dy, w: dw, h: dh };

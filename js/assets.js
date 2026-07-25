@@ -20,7 +20,8 @@
     { name: "hands",         src: "assets/hands.png",         sheet: { cols: 3, rows: 1 }, px: 90,  levels: 10 }, // 0 idle,1 press,2 type
     { name: "runbtn",        src: "assets/runbtn.png",        sheet: { cols: 2, rows: 1 }, px: 56,  levels: 8 },  // 0 up,1 down
     { name: "desk",          src: "assets/desk.png",          px: 256, levels: 24 },
-    { name: "room",          src: "assets/room.gif" },
+    // keep the GIF as a LIVE <img> — drawing a decoded canvas copy freezes it
+    { name: "room",          src: "assets/room.gif", live: true },
     { name: "player",        src: "assets/player.png",        sheet: { cols: 4, rows: 2 }, px: 64,  levels: 8 },
     { name: "drinks",        src: "assets/drinks.png",        sheet: { cols: 5, rows: 1 }, px: 56,  levels: 10 },
     { name: "pack_gears",    src: "assets/pack_gears.png",    px: 72, levels: 10 },
@@ -81,7 +82,9 @@
     try {
       var d = sc.getImageData(0, 0, sw, sh), p = d.data, step = 255 / (levels || 12);
       for (var i = 0; i < p.length; i += 4) {
-        if (p[i + 3] < 110) { p[i + 3] = 0; continue; }   // harden alpha (no soft AI halo)
+        // harden alpha: anything not solidly opaque becomes fully transparent,
+        // which removes leftover halo/fringe pixels from the keying step
+        if (p[i + 3] < 200) { p[i + 3] = 0; continue; }
         p[i + 3] = 255;
         p[i] = Math.round(p[i] / step) * step;
         p[i + 1] = Math.round(p[i + 1] / step) * step;
@@ -109,6 +112,11 @@
   }
 
   function process(spec, img) {
+    if (spec.live) {   // store the live element so animated frames keep playing
+      store[spec.name] = img;
+      meta[spec.name] = { ok: true, frames: 1, w: img.width, h: img.height, live: true };
+      return;
+    }
     var cv = toCanvas(img);
     if (spec.sheet) {
       var cells = sliceSheet(cv, spec.sheet.cols, spec.sheet.rows);

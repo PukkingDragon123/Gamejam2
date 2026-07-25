@@ -692,3 +692,68 @@ body{
 .up-card:hover, .sh-row:hover{ background:#3e2f1e; border-color:var(--site-link); transform:none; }
 .up-card:active, .sh-row:active{ transform:translate(1px,1px); }
 .dk-window{ border-radius:0; }
+
+/* =========================================================
+   v9 — true fullscreen stage + old-OS itch-themed desktop
+   ========================================================= */
+html,body{ overflow:hidden; background:#0d0906; }
+#app{ max-width:none; width:100vw; height:100vh; height:100dvh; padding:0; gap:0; }
+#stage{ border:0; box-shadow:none; background:#0d0906; }
+#game{ width:100%; height:100%; object-fit:contain; }
+
+/* ---- desktop: old-OS window chrome, itch palette ---- */
+.desktop{
+  width:min(760px,96vw); height:min(500px,88vh);
+  background:#1c1a1f; border:0;
+  box-shadow:0 0 0 3px #0a0a0c, 0 12px 0 rgba(0,0,0,.5);
+  display:flex; flex-direction:column; overflow:hidden;
+  image-rendering:pixelated;
+}
+/* title bar like a 90s window, itch red */
+.desktop::before{
+  content:"GearOS  —  Desktop";
+  display:block; flex:0 0 auto;
+  background:linear-gradient(#fa5c5c,#c93a3a);
+  color:#fff; font-size:12px; padding:7px 10px;
+  border-bottom:3px solid #7a2222;
+  text-align:left; letter-spacing:.05em;
+}
+.dk-wall{
+  background:
+    repeating-linear-gradient(45deg,#26242b 0 4px,#232128 4px 8px);
+  border:3px solid #3a3742; border-width:0 0 3px 0;
+  padding:16px;
+}
+.dk-logo{ color:rgba(250,92,92,.20); }
+.dk-logo span{ color:rgba(255,255,255,.12); }
+.dk-icon{
+  background:transparent; border:2px solid transparent; padding:8px 4px;
+}
+.dk-icon:hover{ background:#fa5c5c22; border-color:#fa5c5c; }
+.dk-icon[data-app="engine"]{ background:#fa5c5c1a; border-color:#fa5c5c88; }
+.dk-label{ color:#e8e4ee; font-size:11px; text-shadow:1px 1px 0 #000; }
+.dk-taskbar{
+  background:#2b2830; border-top:3px solid #45414e;
+  color:#cfc9d8; height:38px; flex:0 0 38px;
+}
+.dk-start{
+  background:#fa5c5c; color:#fff; border:2px solid #ff8a8a;
+  border-bottom-color:#8a2a2a; border-right-color:#8a2a2a; padding:5px 12px;
+}
+.dk-start:hover{ background:#ff7373; filter:none; }
+.dk-hint{ color:#a49cb4; }
+.dk-hint b{ color:#fa8c5c; }
+.dk-window{
+  background:#1c1a1f; border:3px solid #45414e; box-shadow:0 0 0 3px #0a0a0c;
+}
+.dk-titlebar{ background:linear-gradient(#fa5c5c,#c93a3a); color:#fff; border-bottom:2px solid #7a2222; }
+.dk-titlebar .dk-x{ background:#7a2222; color:#fff; border:1px solid #ff8a8a; }
+.dk-body{ color:#d8d2e2; }
+
+/* mobile: give the keyboard room, keep everything reachable */
+@media (max-width:640px){
+  .desktop{ width:96vw; height:80vh; }
+  .dk-icons{ flex-direction:row; flex-wrap:wrap; gap:10px; }
+  .dk-icon{ width:76px; }
+  .dk-hint{ display:none; }
+}

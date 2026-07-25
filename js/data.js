@@ -13,12 +13,13 @@
   "use strict";
 
   // ---- shared canvas layout (4:3 to match the desk scene) ----
+  // 16:9 so the room GIF fits edge-to-edge and the game can go fullscreen
   var LAYOUT = {
-    W: 512, H: 384,
-    // monitor screen region on desk.png (normalized) — fits inside the CRT glass
-    screen: { x: 0.29, y: 0.20, w: 0.278, h: 0.325 },
-    // on-screen keyboard region (normalized) — big & chunky
-    keyboard: { x: 0.035, y: 0.60, w: 0.93, h: 0.335 }
+    W: 640, H: 360,
+    // monitor screen region (normalized) — desk art is drawn "cover"
+    screen: { x: 0.335, y: 0.145, w: 0.245, h: 0.315 },
+    // on-screen keyboard region — big, tall, unmissable on phones
+    keyboard: { x: 0.055, y: 0.545, w: 0.89, h: 0.40 }
   };
 
   // Interactive keyboard rows (labels). SPACE handled specially.
