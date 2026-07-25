@@ -149,7 +149,7 @@
     G.state = "itch";
     var html = '<div class="itch">' +
       '<div class="itch-top"><span class="itch-logo">itch<span>.io</span></span>' +
-      '<span class="itch-players">👥 <b id="itch-count">' + fmt(G.players) + '</b> players</span></div>' +
+      '<span class="itch-players"><canvas id="pplic" width="22" height="22"></canvas> <b id="itch-count">' + fmt(G.players) + '</b> players</span></div>' +
       '<div class="itch-card">' +
       '<div class="itch-thumb" id="itch-thumb"></div>' +
       '<div class="itch-meta"><div class="itch-title">My Game #' + G.shipped + '</div>' +
@@ -162,6 +162,8 @@
     var thumb = document.getElementById("itch-thumb");
     var tc = document.createElement("canvas"); tc.width = 96; tc.height = 72; var tx = tc.getContext("2d");
     R.deskScene(tx); thumb.appendChild(tc);
+    // pixel players icon in header
+    var pplic = document.getElementById("pplic"); if (pplic) R.peopleIcon(pplic.getContext("2d"), 11, 12, 16);
     renderUpgrades();
     document.getElementById("ov-btn").onclick = function () { A.sfx.ui(); startCode(); };
   }
@@ -174,7 +176,7 @@
       var div = document.createElement("div"); div.className = "up-card" + (afford ? "" : " broke");
       var cv = document.createElement("canvas"); cv.width = 40; cv.height = 40; var ux = cv.getContext("2d"); ux.imageSmoothingEnabled = false;
       R.upgradeIcon(ux, u.icon, 20, 20, 26); div.appendChild(cv);
-      var nm = document.createElement("div"); nm.className = "up-name"; nm.textContent = u.name + (owned ? " ·" + owned : ""); div.appendChild(nm);
+      var nm = document.createElement("div"); nm.className = "up-name"; nm.textContent = u.name + (owned ? "  Lv" + owned : ""); div.appendChild(nm);
       var ds = document.createElement("div"); ds.className = "up-desc"; ds.textContent = u.desc; div.appendChild(ds);
       var co = document.createElement("div"); co.className = "up-cost"; co.textContent = "👥 " + fmt(cost); div.appendChild(co);
       div.onclick = function () { buyUpgrade(u); };
@@ -198,6 +200,7 @@
       '<p class="lead">Type the code. Ship the game. Watch the players roll in.</p>' +
       '<p>Follow the glowing keys and <b>type fast</b> — the clock is ticking. Then <b>mash the red button</b> to ship it, and spend your players on <b>upgrades</b>.</p>' +
       '<button class="big-btn" id="ov-btn">▶ START CODING</button></div>');
+    els.overlay.classList.add("title-mode");
     document.getElementById("ov-btn").onclick = function () { A.sfx.ui(); G.players = 0; G.shipped = 0; G.upg = { autocomplete: 0, marketing: 0, viral: 0, coffee: 0 }; startCode(); };
   }
 
@@ -252,23 +255,27 @@
       bigClock(t);
       hud();
     } else if (G.state === "ship") {
-      // monitor shows compiling
-      R.monitorCode(ctx, "> COMPILING BUILD...", Math.min(("> COMPILING BUILD...").length, Math.floor(t * 10) % 22), t, {});
-      // build bar
-      var bx = W * 0.3, bw = W * 0.4, by = H * 0.30;
-      R.fillRR(ctx, bx - 2, by - 2, bw + 4, 12, 3, "#000");
-      R.fillRR(ctx, bx, by, bw, 8, 2, "#241812");
-      R.fillRR(ctx, bx, by, bw * (G.build / GAME.shipTarget), 8, 2, "#5fe0a0");
-      ctx.fillStyle = "#ffd24d"; ctx.font = "bold 12px 'Courier New',monospace"; ctx.textAlign = "center";
-      ctx.fillText("MASH  SPACE  TO  SHIP!", W / 2, by - 10);
-      // red button
-      R.runButton(ctx, W / 2, H * 0.5, H * 0.34, G.btn > 0, t);
-      // press hand
-      R.handsSprite(ctx, 1, W / 2, t, { scale: 0.55, tap: (G.btn > 0 ? 26 : 0), bobAmt: 2, fast: G.build > 0 });
+      // monitor keeps showing the finished code (aligned to the CRT)
+      R.monitorCode(ctx, G.target, G.target.length, t, {});
+      // red button sits on the desk to the RIGHT of the monitor
+      var bx = W * 0.80, by = H * 0.60, squash = G.btn > 0 ? 1 : 0;
+      // build bar above the button
+      var barW = 120, barX = bx - barW / 2, barY = by - H * 0.30;
+      ctx.fillStyle = "#ffca55"; ctx.font = "bold 11px 'Courier New',monospace"; ctx.textAlign = "center";
+      var pulse = 1 + 0.06 * Math.sin(t * 14);
+      ctx.save(); ctx.translate(bx, barY - 14); ctx.scale(pulse, pulse); ctx.fillText("MASH SPACE!", 0, 0); ctx.restore();
+      R.fillRR(ctx, barX - 2, barY - 2, barW + 4, 12, 3, "#000");
+      R.fillRR(ctx, barX, barY, barW, 8, 2, "#241812");
+      R.fillRR(ctx, barX, barY, barW * (G.build / GAME.shipTarget), 8, 2, "#5fe0a0");
+      // the button (squashes when pressed)
+      R.runButton(ctx, bx, by, H * (0.30 - squash * 0.02), G.btn > 0, t);
+      // press hand reaches in from the bottom-right toward the button
+      R.handsSprite(ctx, 1, bx - 6, t, { scale: 0.6, tap: (G.btn > 0 ? 30 : 6), bobAmt: 2, fast: G.build > 0 });
       hud();
     } else {
-      // title / itch: dim desk behind the overlay + idle hands
-      R.handsSprite(ctx, 0, W / 2, t, { scale: 0.5, bobAmt: 3 });
+      // title: a bouncy walking dev along the desk; itch: idle hands
+      if (G.state === "title") walker(t);
+      else R.handsSprite(ctx, 0, W / 2, t, { scale: 0.5, bobAmt: 3 });
     }
 
     // pops
@@ -309,6 +316,16 @@
 
   function pop(x, y, txt, color, size) { G.pops.push({ x: x, y: y, txt: txt, color: color, size: size || 14, life: 0.9, vy: -30 }); }
 
+  // bouncy little dev walking across the desk edge (title screen)
+  function walker(t) {
+    var speed = 52, period = W + 140, x = ((t * speed) % period) - 70, feetY = H * 0.955;
+    var hop = Math.abs(Math.sin(t * 6)), bob = -hop * 8;
+    // shadow (shrinks on the up-beat)
+    ctx.save(); ctx.globalAlpha = 0.28 - hop * 0.14; ctx.beginPath(); ctx.ellipse(x, feetY, 16 - hop * 4, 4.5, 0, 0, 6.28); ctx.fillStyle = "#000"; ctx.fill(); ctx.restore();
+    var frame = (Math.floor(t * 6) % 2) ? "walkB" : "walkA";
+    R.playerSprite(ctx, frame, x, feetY + bob, H * 0.34, true, t, "");
+  }
+
   // =========================================================
   //  helpers
   // =========================================================
@@ -319,7 +336,7 @@
     return String(n);
   }
   function overlay(html) { els.overlay.innerHTML = html; els.overlay.classList.add("show"); }
-  function hideOverlay() { els.overlay.classList.remove("show"); els.overlay.innerHTML = ""; }
+  function hideOverlay() { els.overlay.classList.remove("show", "title-mode"); els.overlay.innerHTML = ""; }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
   global.Game = G;

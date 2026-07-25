@@ -15,10 +15,10 @@
   // ---- shared canvas layout (4:3 to match the desk scene) ----
   var LAYOUT = {
     W: 512, H: 384,
-    // monitor screen region on the desk image (normalized 0..1)
-    screen: { x: 0.255, y: 0.135, w: 0.375, h: 0.40 },
-    // on-screen keyboard region (normalized)
-    keyboard: { x: 0.05, y: 0.70, w: 0.90, h: 0.20 }
+    // monitor screen region on desk.png (normalized) — fits inside the CRT glass
+    screen: { x: 0.29, y: 0.20, w: 0.278, h: 0.325 },
+    // on-screen keyboard region (normalized) — taller for fat keycaps
+    keyboard: { x: 0.045, y: 0.665, w: 0.91, h: 0.245 }
   };
 
   // Interactive keyboard rows (labels). SPACE handled specially.

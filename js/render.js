@@ -737,11 +737,11 @@
     if (_kb) return _kb;
     var reg = { x: L.keyboard.x * W, y: L.keyboard.y * H, w: L.keyboard.w * W, h: L.keyboard.h * H };
     var rows = global.JamData.KEYROWS, keys = [];
-    var gap = 2, kh = reg.h / rows.length - gap;
+    var gap = 3, kh = reg.h / rows.length - gap;
     for (var r = 0; r < rows.length; r++) {
       var y = reg.y + r * (kh + gap);
-      if (rows[r] === "_SPACE_") { var sw = reg.w * 0.5; keys.push({ label: "SPACE", char: " ", x: reg.x + (reg.w - sw) / 2, y: y, w: sw, h: kh }); continue; }
-      var chars = rows[r], n = chars.length, kw = reg.w / 10.5 - gap, rowW = n * (kw + gap) - gap, sx = reg.x + (reg.w - rowW) / 2;
+      if (rows[r] === "_SPACE_") { var sw = reg.w * 0.52; keys.push({ label: "SPACE", char: " ", x: reg.x + (reg.w - sw) / 2, y: y, w: sw, h: kh }); continue; }
+      var chars = rows[r], n = chars.length, kw = reg.w / 10.4 - gap, rowW = n * (kw + gap) - gap, sx = reg.x + (reg.w - rowW) / 2;
       for (var k = 0; k < n; k++) keys.push({ label: chars[k], char: chars[k], x: sx + k * (kw + gap), y: y, w: kw, h: kh });
     }
     _kb = { region: reg, keys: keys };
@@ -754,30 +754,40 @@
     for (var i = 0; i < keys.length; i++) if (keys[i].char === up || keys[i].char === ch) return keys[i];
     return null;
   }
+  // Fat, cozy ivory keycaps with chunky 3D depth.
   function keyboard(ctx, opts) {
     opts = opts || {};
-    var kb = keyboardLayout(), nextK = opts.next ? keyForChar(opts.next) : null, pressed = opts.pressed || {};
-    // base plate
+    var kb = keyboardLayout(), nextK = opts.next ? keyForChar(opts.next) : null, pressed = opts.pressed || {}, t = opts.t || 0;
     var reg = kb.region;
-    fillRR(ctx, reg.x - 6, reg.y - 6, reg.w + 12, reg.h + 14, 6, "#241812");
-    fillRR(ctx, reg.x - 6, reg.y - 6, reg.w + 12, 4, 6, "#3a2a1e");
+    // wooden/cream deck tray
+    fillRR(ctx, reg.x - 10, reg.y - 9, reg.w + 20, reg.h + 20, 8, "#2a1d13");
+    fillRR(ctx, reg.x - 7, reg.y - 7, reg.w + 14, reg.h + 15, 7, "#6a5136");
+    fillRR(ctx, reg.x - 7, reg.y - 7, reg.w + 14, 5, 7, "#8a6f4a");
+    var depth = 5;
     kb.keys.forEach(function (key) {
-      var down = pressed[key.char] > 0;
+      var down = pressed[key.char] > 0 ? depth - 1 : 0;
       var isNext = nextK && nextK === key;
-      var top = down ? key.y + 2 : key.y;
-      // key side (depth)
-      fillRR(ctx, key.x, key.y + 2, key.w, key.h, 3, "#120b08");
-      // key cap
-      var capC = isNext ? "#3a3320" : "#2f261d";
-      var g = ctx.createLinearGradient(0, top, 0, top + key.h);
-      g.addColorStop(0, shade(capC, 0.5)); g.addColorStop(1, shade(capC, -0.2));
-      ctx.fillStyle = g; rr(ctx, key.x, top, key.w, key.h - (down ? 0 : 2), 3); ctx.fill();
-      // top highlight
-      ctx.globalAlpha = 0.4; px(ctx, key.x + 2, top + 2, key.w - 4, 2, "#efe0c8"); ctx.globalAlpha = 1;
-      if (isNext) { ctx.strokeStyle = "#ffd24d"; ctx.lineWidth = 1.5; rr(ctx, key.x + 0.5, top + 0.5, key.w - 1, key.h - 2, 3); ctx.stroke(); ctx.globalAlpha = 0.25 + 0.15 * Math.sin((opts.t || 0) * 8); ctx.fillStyle = "#ffd24d"; rr(ctx, key.x, top, key.w, key.h - 2, 3); ctx.fill(); ctx.globalAlpha = 1; }
-      // label
-      ctx.fillStyle = isNext ? "#ffe9a8" : "#b8a48e"; ctx.font = "6px 'Courier New',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText(key.label === "SPACE" ? "" : key.label, key.x + key.w / 2, top + key.h / 2);
+      var kx = key.x, ky = key.y, kw = key.w, kh = key.h - depth;
+      // base / side (the chunky depth block)
+      fillRR(ctx, kx, ky + kh - 2, kw, depth + 4, 4, "#5a4026");
+      fillRR(ctx, kx, ky + kh + depth - 2 - down, kw, 3, 3, "#3a2818");
+      // keycap top (ivory), depresses when down
+      var topY = ky + down;
+      var capTop = isNext ? "#ffe6a0" : "#f0e6cf";
+      var capBot = isNext ? "#e0b24d" : "#c9b78e";
+      var g = ctx.createLinearGradient(0, topY, 0, topY + kh);
+      g.addColorStop(0, capTop); g.addColorStop(1, capBot);
+      ctx.fillStyle = g; rr(ctx, kx, topY, kw, kh, 4); ctx.fill();
+      // dish highlight + inner shade
+      ctx.globalAlpha = 0.55; fillRR(ctx, kx + 2, topY + 2, kw - 4, kh * 0.34, 3, "#fffaf0"); ctx.globalAlpha = 1;
+      ctx.strokeStyle = shade(capBot, -0.25); ctx.lineWidth = 1; rr(ctx, kx + 0.5, topY + 0.5, kw - 1, kh - 1, 4); ctx.stroke();
+      if (isNext) {
+        ctx.strokeStyle = "#ff9a3d"; ctx.lineWidth = 2; rr(ctx, kx - 0.5, topY - 0.5, kw + 1, kh + 1, 4); ctx.stroke();
+        ctx.save(); ctx.globalAlpha = 0.25 + 0.18 * Math.sin(t * 8); circle(ctx, kx + kw / 2, topY + kh / 2, kw * 0.6, "#ffca55"); ctx.restore();
+      }
+      // label (dark, engraved look)
+      ctx.fillStyle = isNext ? "#7a4a12" : "#7c6a4a"; ctx.font = "bold 7px 'Courier New',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(key.label === "SPACE" ? "___" : key.label, kx + kw / 2, topY + kh / 2 + 1);
     });
     ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   }
@@ -837,6 +847,18 @@
     ctx.restore();
   }
 
+  // little pixel "players" icon (two folks)
+  function peopleIcon(ctx, cx, cy, s) {
+    var folks = [[-s * 0.26, "#6ee0ff"], [s * 0.26, "#ffca55"]];
+    folks.forEach(function (f) {
+      var x = cx + f[0];
+      fillRR(ctx, x - s * 0.22, cy - s * 0.02, s * 0.44, s * 0.36, s * 0.12, f[1]);
+      circle(ctx, x, cy - s * 0.22, s * 0.18, f[1]);
+      circle(ctx, x, cy - s * 0.22, s * 0.18, f[1]);
+      ctx.globalAlpha = 0.35; fillRR(ctx, x - s * 0.14, cy, s * 0.1, s * 0.3, s * 0.05, "#000"); ctx.globalAlpha = 1;
+    });
+  }
+
   function vignette(ctx) {
     var g = ctx.createRadialGradient(W / 2, H * 0.5, H * 0.35, W / 2, H * 0.5, H * 0.85);
     g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,0.45)");
@@ -852,6 +874,6 @@
     roomScene: roomScene, playerSprite: playerSprite, drinkSprite: drinkSprite, packSprite: packSprite, packRip: packRip,
     screenRect: screenRect, deskScene: deskScene, monitorCode: monitorCode,
     keyboardLayout: keyboardLayout, keyForChar: keyForChar, keyboard: keyboard,
-    handsSprite: handsSprite, runButton: runButton, upgradeIcon: upgradeIcon, vignette: vignette
+    handsSprite: handsSprite, runButton: runButton, upgradeIcon: upgradeIcon, peopleIcon: peopleIcon, vignette: vignette
   };
 })(window);
