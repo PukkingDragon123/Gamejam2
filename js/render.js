@@ -884,6 +884,77 @@
     ctx.restore();
   }
 
+  // ---- hand-drawn pixel desktop icons (no emoji) ----
+  function desktopIcon(ctx, key, cx, cy, s) {
+    var u = s / 16;                       // pixel unit for a 16x16-ish icon
+    function P(x, y, w, h, c) { px(ctx, cx + x * u, cy + y * u, w * u, h * u, c); }
+    ctx.save();
+    switch (key) {
+      case "engine": // CRT monitor with code + a gear
+        P(-7, -6, 14, 10, "#2a2018"); P(-6, -5, 12, 8, "#d8cfb8");     // bezel
+        P(-5, -4, 10, 6, "#12301f");                                    // screen
+        P(-4, -3, 5, 1, "#7ce0a0"); P(-4, -1, 7, 1, "#ffd24d"); P(-4, 1, 4, 1, "#6ee0ff");
+        P(-2, 4, 4, 2, "#b8ab90"); P(-4, 6, 8, 1, "#8a7f68");           // stand
+        break;
+      case "shop":  // browser window with a shopping cart
+        P(-7, -6, 14, 12, "#e8e0cc"); P(-7, -6, 14, 3, "#5c8ab8");      // window + title bar
+        P(-6, -5, 1, 1, "#ff6a5a"); P(-4, -5, 1, 1, "#ffd24d"); P(-2, -5, 1, 1, "#7bd88a");
+        P(-4, 0, 7, 4, "#3a2c1e"); P(-5, -1, 2, 1, "#3a2c1e");         // cart body+handle
+        P(-3, 4, 2, 2, "#3a2c1e"); P(1, 4, 2, 2, "#3a2c1e");           // wheels
+        break;
+      case "net":   // globe
+        circle(ctx, cx, cy, s * 0.4, "#4a9ad0"); circle(ctx, cx, cy, s * 0.4 - u, "#6ec4f0");
+        P(-6, -1, 12, 1, "#2a6a9a"); P(-1, -6, 2, 12, "#2a6a9a");
+        ctx.globalAlpha = 0.35; P(-4, -4, 3, 3, "#fff"); ctx.globalAlpha = 1;
+        break;
+      case "trash": // wire bin
+        P(-5, -6, 10, 2, "#9aa0a8"); P(-2, -8, 4, 2, "#9aa0a8");
+        P(-4, -4, 8, 10, "#b8bec6");
+        for (var i = -3; i < 4; i += 2) P(i, -3, 1, 8, "#7a8088");
+        break;
+      case "folder":
+        P(-7, -4, 6, 2, "#e0a83c"); P(-7, -2, 14, 8, "#f0c25a"); P(-7, -2, 14, 1, "#fff0c0");
+        break;
+    }
+    ctx.restore();
+  }
+
+  // ---- lighting helpers ----
+  // Warm light pool (e.g. window / lamp / monitor spill)
+  function lightPool(ctx, cx, cy, r, color, alpha) {
+    var g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, color); g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = alpha == null ? 0.25 : alpha;
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 6.28); ctx.fill(); ctx.restore();
+  }
+  // Soft dark grade over the scene, then punch light back in
+  function ambient(ctx, tint, alpha) {
+    ctx.save(); ctx.globalCompositeOperation = "multiply"; ctx.globalAlpha = alpha == null ? 0.35 : alpha;
+    ctx.fillStyle = tint || "#6a4a2a"; ctx.fillRect(0, 0, W, H); ctx.restore();
+  }
+  // Elliptical contact shadow that squashes with height
+  function contactShadow(ctx, x, y, rw, lift) {
+    ctx.save(); ctx.globalAlpha = Math.max(0.06, 0.3 - lift * 0.02);
+    ctx.beginPath(); ctx.ellipse(x, y, Math.max(3, rw - lift * 0.5), Math.max(1.5, rw * 0.28 - lift * 0.1), 0, 0, 6.28);
+    ctx.fillStyle = "#000"; ctx.fill(); ctx.restore();
+  }
+
+  // ---- big drink sprite for the drinking minigame ----
+  function drinkBig(ctx, drink, cx, cy, h, tilt, fill) {
+    ctx.save();
+    ctx.translate(cx, cy); ctx.rotate(tilt || 0);
+    drinkSprite(ctx, drink, 0, 0, h);
+    ctx.restore();
+    // fill gauge as bubbles rising
+    if (fill != null) {
+      for (var i = 0; i < 6; i++) {
+        var a = (i / 6) * 6.28 + (fill * 8);
+        var bx = cx + Math.cos(a) * h * 0.22, by = cy + h * 0.34 - (fill * h * 0.6) - (i % 3) * 6;
+        ctx.save(); ctx.globalAlpha = 0.5; circle(ctx, bx, by, 2 - (i % 2), "#fff"); ctx.restore();
+      }
+    }
+  }
+
   // little pixel "players" icon (two folks)
   function peopleIcon(ctx, cx, cy, s) {
     var folks = [[-s * 0.26, "#6ee0ff"], [s * 0.26, "#ffca55"]];
@@ -912,6 +983,7 @@
     roomCanvas: roomCanvas, roomMap: roomMap, roomRect: roomRect,
     screenRect: screenRect, deskScene: deskScene, monitorCode: monitorCode,
     keyboardLayout: keyboardLayout, keyForChar: keyForChar, keyboard: keyboard,
-    handsSprite: handsSprite, runButton: runButton, upgradeIcon: upgradeIcon, peopleIcon: peopleIcon, keyGlow: keyGlow, vignette: vignette
+    handsSprite: handsSprite, runButton: runButton, upgradeIcon: upgradeIcon, peopleIcon: peopleIcon, keyGlow: keyGlow, vignette: vignette,
+    desktopIcon: desktopIcon, lightPool: lightPool, ambient: ambient, contactShadow: contactShadow, drinkBig: drinkBig
   };
 })(window);

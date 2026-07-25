@@ -102,6 +102,8 @@
       }
     } else if (G.state === "ship") {
       mash();
+    } else if (G.state === "chug") {
+      chugClick();
     }
   }
 
@@ -111,6 +113,8 @@
       if (e.key.length === 1) { typeChar(e.key); e.preventDefault(); }
     } else if (G.state === "ship") {
       if (e.key === " " || e.key === "Enter") { mash(); e.preventDefault(); }
+    } else if (G.state === "chug") {
+      if (e.key === " " || e.key === "Enter") { chugClick(); e.preventDefault(); }
     }
   }
 
@@ -141,10 +145,13 @@
   }
   function updateRoom(dt) {
     var pl = G.player, rr = R.roomRect();
+    pl.idleT = (pl.idleT || 0) + dt;
     if (pl.target != null) {
-      var dx = pl.target - pl.x, spd = ROOM.walk * rr.w * dt;
-      if (Math.abs(dx) <= spd) { pl.x = pl.target; pl.target = null; pl.moving = false; if (pl.intend) { pl.intend = false; openDesktop(); } }
-      else { pl.x += Math.sign(dx) * spd; pl.facing = dx < 0 ? -1 : 1; pl.moving = true; pl.animT += dt; }
+      var dx = pl.target - pl.x, dist = Math.abs(dx);
+      // ease-out as we arrive so stops feel soft, not robotic
+      var maxSpd = ROOM.walk * rr.w, spd = maxSpd * Math.min(1, 0.25 + dist / 60) * dt;
+      if (dist <= spd) { pl.x = pl.target; pl.target = null; pl.moving = false; pl.animT = 0; if (pl.intend) { pl.intend = false; openDesktop(); } }
+      else { pl.x += Math.sign(dx) * spd; pl.facing = dx < 0 ? -1 : 1; pl.moving = true; pl.animT += dt * Math.min(1.6, 0.6 + dist / 90); }
     } else pl.moving = false;
   }
   function computerRectC() {
@@ -156,10 +163,17 @@
     var cz = computerRectC(), pl = G.player, hgt = ROOM.scale * R.roomRect().h;
     var hover = G.hoverComputer;
     if (hover) { ctx.save(); ctx.strokeStyle = "#ffe08a"; ctx.lineWidth = 2; ctx.globalAlpha = 0.5 + 0.35 * Math.sin(t * 6); R.rr(ctx, cz.x + 2, cz.y, cz.w - 4, cz.h, 6); ctx.stroke(); ctx.restore(); }
-    var frame = pl.moving ? (Math.floor(pl.animT / 0.18) % 2 ? "walkB" : "walkA") : "back";
-    // ground shadow + hop
-    ctx.save(); ctx.globalAlpha = 0.28; ctx.beginPath(); ctx.ellipse(pl.x, pl.feetY, 14, 4, 0, 0, 6.28); ctx.fillStyle = "#000"; ctx.fill(); ctx.restore();
-    R.playerSprite(ctx, frame, pl.x, pl.feetY, hgt, pl.facing === 1, t, "");
+    // warm light spilling from the window + the CRT glow (lighting pass)
+    var win = R.roomMap(0.42, 0.35), mon = R.roomMap(0.09, 0.55);
+    R.lightPool(ctx, win.x, win.y, R.roomRect().w * 0.30, "#ffcf8a", 0.20 + 0.02 * Math.sin(t * 1.5));
+    R.lightPool(ctx, mon.x, mon.y, R.roomRect().w * 0.16, "#9fe0ff", 0.13 + 0.03 * Math.sin(t * 3.1));
+
+    // walk cycle + breathing idle
+    var hop = pl.moving ? Math.abs(Math.sin(pl.animT * 9)) : 0;
+    var breathe = pl.moving ? 0 : Math.sin((pl.idleT || 0) * 2.2) * 1.4;
+    var frame = pl.moving ? (Math.floor(pl.animT / 0.16) % 2 ? "walkB" : "walkA") : "back";
+    R.contactShadow(ctx, pl.x, pl.feetY, 15, hop * 5);
+    R.playerSprite(ctx, frame, pl.x, pl.feetY - hop * 4 + breathe, hgt * (1 + hop * 0.02), pl.facing === 1, t, "");
     // prompt
     if (hover || Math.abs(pl.x - R.roomMap(ROOM.standX, 0).x) < 40) {
       ctx.save(); ctx.textAlign = "center";
@@ -180,57 +194,105 @@
   function openDesktop() {
     G.state = "desktop";
     var apps = [
-      { id: "engine", icon: "🖥️", name: "GearEngine" },
-      { id: "fridge", icon: "🧊", name: "Fridge" },
-      { id: "net", icon: "🌐", name: "GameJamNet" },
-      { id: "trash", icon: "🗑️", name: "Recycle" }
+      { id: "engine", name: "GearEngine" },
+      { id: "shop", name: "DrinkMart" },
+      { id: "net", name: "GameJamNet" },
+      { id: "trash", name: "Recycle" }
     ];
-    var icons = apps.map(function (a) { return '<button class="dk-icon" data-app="' + a.id + '"><span class="dk-emoji">' + a.icon + '</span><span class="dk-label">' + a.name + '</span></button>'; }).join("");
+    var icons = apps.map(function (a) {
+      return '<button class="dk-icon" data-app="' + a.id + '"><canvas class="dk-ico" width="48" height="48" data-icon="' + a.id + '"></canvas><span class="dk-label">' + a.name + '</span></button>';
+    }).join("");
     overlay('<div class="desktop"><div class="dk-wall"><div class="dk-logo">GearOS<span>95</span></div><div class="dk-icons">' + icons + '</div></div>' +
-      '<div class="dk-taskbar"><button class="dk-start">▚ Start</button><span class="dk-hint">Open <b>GearEngine</b> to make a game · <b>Fridge</b> for a drink</span><span class="dk-clock">👥 ' + fmt(G.players) + '</span></div></div>');
+      '<div class="dk-taskbar"><button class="dk-start">Start</button><span class="dk-hint">Open <b>GearEngine</b> to make a game · <b>DrinkMart</b> to order a drink</span><span class="dk-clock" id="dk-players"></span></div></div>');
     var wrap = els.overlay.querySelector(".desktop");
+    // draw the hand-made pixel icons
+    wrap.querySelectorAll(".dk-ico").forEach(function (cv) {
+      var c = cv.getContext("2d"); c.imageSmoothingEnabled = false;
+      R.desktopIcon(c, cv.getAttribute("data-icon"), 24, 24, 40);
+    });
+    playersChip(document.getElementById("dk-players"));
     wrap.querySelectorAll(".dk-icon").forEach(function (btn) { btn.onclick = function () { A.sfx.ui(); onDesktopApp(btn.getAttribute("data-app")); }; });
     wrap.querySelector(".dk-start").onclick = function () { A.sfx.ui(); onDesktopApp("engine"); };
   }
+
+  // small "players" chip with the pixel icon (reused across screens)
+  function playersChip(host) {
+    if (!host) return;
+    host.innerHTML = '<canvas width="20" height="20"></canvas><b>' + fmt(G.players) + '</b>';
+    var cv = host.querySelector("canvas"); R.peopleIcon(cv.getContext("2d"), 10, 11, 15);
+  }
+
   function onDesktopApp(id) {
     if (id === "engine") { A.sfx.select(); startCode(); return; }
-    if (id === "fridge") { A.sfx.ui(); openDrinks(); return; }
-    var win = { net: "🌐 GameJamNet<br><i>“day one and someone already has a vertical slice??”</i><br>(do NOT read the comments.)", trash: "🗑️ Recycle Bin<br>0 items. You never delete anything." }[id] || "…";
+    if (id === "shop") { A.sfx.ui(); openShop(); return; }
+    var win = { net: "<b>GameJamNet</b><br><i>“day one and someone already has a vertical slice??”</i><br>(do NOT read the comments.)", trash: "<b>Recycle Bin</b><br>0 items. You never delete anything." }[id] || "…";
     var w = document.createElement("div"); w.className = "dk-window";
-    w.innerHTML = '<div class="dk-titlebar"><span>' + id + '.exe</span><button class="dk-x">✕</button></div><div class="dk-body">' + win + '</div>';
+    w.innerHTML = '<div class="dk-titlebar"><span>' + id + '.exe</span><button class="dk-x">×</button></div><div class="dk-body">' + win + '</div>';
     els.overlay.querySelector(".desktop").appendChild(w);
     w.querySelector(".dk-x").onclick = function () { w.remove(); };
   }
 
   // =========================================================
-  //  DRINKS (a buff for your next coding session)
+  //  DRINKMART — order online, then chug it
   // =========================================================
-  var DRINK_FX = {
-    cola:    { text: "+30% players next ship", apply: function () { G.buff.shipMult = 1.3; }, tag: "🔥" },
-    monster: { text: "clock 30% slower next game", apply: function () { G.buff.clockSlow = 0.7; }, tag: "🐌" },
-    brew:    { text: "next game starts 4 chars typed", apply: function () { G.buff.preType = 4; }, tag: "⌨" },
-    oj:      { text: "+60 players right now", apply: function () { G.players += 60; }, tag: "💰" },
-    water:   { text: "refreshing: +25 players", apply: function () { G.players += 25; }, tag: "💧" }
-  };
-  function openDrinks() {
-    G.state = "drinks";
-    var html = '<div class="drinks-modal itch"><h1 style="text-align:center;color:#ffca55">🧊 FRIDGE</h1><p style="text-align:center;color:#b8a48e">Grab a drink for a boost on your next game.</p><div class="drinks-row" id="drinks-row"></div><button class="big-btn" id="ov-btn">↩ Back to desktop</button></div>';
-    overlay(html);
-    var row = document.getElementById("drinks-row");
-    global.JamData.DRINKS.forEach(function (d) {
-      var fx = DRINK_FX[d.id] || { text: d.blurb, apply: function () { }, tag: "" };
-      var div = document.createElement("div"); div.className = "drink";
-      var cv = document.createElement("canvas"); cv.width = 56; cv.height = 78; var cc = cv.getContext("2d"); cc.imageSmoothingEnabled = false;
-      R.drinkSprite(cc, d, 28, 40, 72); div.appendChild(cv);
-      var nm = document.createElement("div"); nm.className = "d-name"; nm.textContent = d.name; div.appendChild(nm);
-      var ef = document.createElement("div"); ef.className = "d-energy"; ef.textContent = fx.tag + " " + fx.text; div.appendChild(ef);
-      div.onclick = function () { chooseDrink(d, fx); };
-      row.appendChild(div);
+  function drinkById(id) { var L2 = global.JamData.DRINKS; for (var i = 0; i < L2.length; i++) if (L2[i].id === id) return L2[i]; return L2[0]; }
+
+  function openShop() {
+    G.state = "shop";
+    var rows = global.JamData.SHOP.map(function (it, i) {
+      var d = drinkById(it.id), afford = G.players >= it.price;
+      return '<div class="sh-row' + (afford ? "" : " broke") + '" data-i="' + i + '">' +
+        '<canvas class="sh-img" width="44" height="60"></canvas>' +
+        '<div class="sh-meta"><div class="sh-name">' + d.name + '</div><div class="sh-tag">' + it.tag + '</div></div>' +
+        '<div class="sh-buy"><span class="sh-price">' + it.price + '</span><span class="sh-cta">BUY</span></div></div>';
+    }).join("");
+    overlay('<div class="shop">' +
+      '<div class="sh-bar"><span class="sh-logo">DrinkMart</span><span class="sh-cart" id="sh-players"></span></div>' +
+      '<div class="sh-list">' + rows + '</div>' +
+      '<button class="big-btn alt" id="sh-back">Back to desktop</button></div>');
+    playersChip(document.getElementById("sh-players"));
+    var wrap = els.overlay.querySelector(".shop");
+    wrap.querySelectorAll(".sh-row").forEach(function (row, i) {
+      var it = global.JamData.SHOP[i], d = drinkById(it.id);
+      var cv = row.querySelector(".sh-img"); var c = cv.getContext("2d"); c.imageSmoothingEnabled = false;
+      R.drinkSprite(c, d, 22, 30, 56);
+      row.onclick = function () { buyDrink(it); };
     });
-    document.getElementById("ov-btn").onclick = function () { A.sfx.ui(); openDesktop(); };
+    document.getElementById("sh-back").onclick = function () { A.sfx.ui(); openDesktop(); };
   }
-  function chooseDrink(d, fx) {
-    A.sfx.sip(); fx.apply(); G.buffName = d.name + " — " + fx.text; openDesktop();
+
+  function buyDrink(item) {
+    if (G.players < item.price) { A.sfx.error(); return; }
+    G.players -= item.price; A.sfx.cash();
+    startChug(item);
+  }
+
+  // rapid-click chugging minigame
+  function startChug(item) {
+    G.state = "chug";
+    G.chug = { item: item, drink: drinkById(item.id), amount: 0, tilt: 0, gulp: 0, done: false, t: 0 };
+    hideOverlay();
+  }
+  function chugClick() {
+    var c = G.chug; if (!c || c.done) return;
+    c.amount = Math.min(1, c.amount + 0.075);
+    c.gulp = 0.16; c.tilt = Math.min(0.9, c.tilt + 0.08);
+    A.sfx.sip(); G.shake = Math.max(G.shake, 2);
+    pop(W / 2 + (Math.random() - 0.5) * 40, H * 0.45, "gulp!", "#ffd24d", 12);
+    if (c.amount >= 1) finishChug();
+  }
+  function finishChug() {
+    var c = G.chug; if (!c || c.done) return; c.done = true;
+    var fx = c.item.fx;
+    if (fx === "shipMult") G.buff.shipMult = 1.3;
+    else if (fx === "clockSlow") G.buff.clockSlow = 0.7;
+    else if (fx === "preType") G.buff.preType = 4;
+    else if (fx === "instant80") G.players += 80;
+    else if (fx === "instant35") G.players += 35;
+    G.buffName = c.drink.name + " — " + c.item.tag;
+    A.sfx.win(); G.shake = 7;
+    pop(W / 2, H * 0.35, "AHHH!", "#7bd88a", 22);
+    setTimeout(function () { G.chug = null; openShop(); }, 900);
   }
 
   function typeChar(ch) {
@@ -373,6 +435,12 @@
     if (G.btn > 0) G.btn = Math.max(0, G.btn - dt);
     for (var k in G.pressed) { G.pressed[k] -= dt; if (G.pressed[k] <= 0) delete G.pressed[k]; }
     if (G.state === "ship") G.build = Math.max(0, G.build - GAME.mashDecay * dt);
+    // chugging: tilt eases back, gulp squash decays
+    if (G.chug) {
+      G.chug.t += dt;
+      if (!G.chug.done) G.chug.tilt = Math.max(0, G.chug.tilt - dt * 0.55);
+      if (G.chug.gulp > 0) G.chug.gulp = Math.max(0, G.chug.gulp - dt);
+    }
     for (var i = G.pops.length - 1; i >= 0; i--) { var p = G.pops[i]; p.y += p.vy * dt; p.life -= dt; if (p.life <= 0) G.pops.splice(i, 1); }
   }
   var affordTimer = 0;
@@ -388,9 +456,12 @@
 
     if (G.state === "room") {
       renderRoom(t);
-    } else if (G.state === "desktop" || G.state === "drinks") {
+    } else if (G.state === "chug") {
+      renderChug(t);
+    } else if (G.state === "desktop" || G.state === "shop") {
       R.roomCanvas(ctx);
-      ctx.save(); ctx.globalAlpha = 0.45; ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H); ctx.restore();
+      ctx.save(); ctx.globalAlpha = 0.5; ctx.fillStyle = "#0d0803"; ctx.fillRect(0, 0, W, H); ctx.restore();
+      R.lightPool(ctx, W / 2, H * 0.45, W * 0.55, "#ffd9a0", 0.10);
     } else if (G.state === "code") {
       R.deskScene(ctx);
       R.monitorCode(ctx, G.target, G.typedLen, t, { mistake: Math.max(0, G.mistakeFlash) });
@@ -461,6 +532,34 @@
   }
 
   function pop(x, y, txt, color, size) { G.pops.push({ x: x, y: y, txt: txt, color: color, size: size || 14, life: 0.9, vy: -30 }); }
+
+  // ---- chugging minigame scene ----
+  function renderChug(t) {
+    var c = G.chug; if (!c) { return; }
+    R.deskScene(ctx);
+    ctx.save(); ctx.globalAlpha = 0.55; ctx.fillStyle = "#120a04"; ctx.fillRect(0, 0, W, H); ctx.restore();
+    R.lightPool(ctx, W / 2, H * 0.42, W * 0.42, "#ffe0b0", 0.22);
+
+    // first-person: the drink is held up close, rising toward the camera as you chug
+    var gulp = c.gulp > 0 ? 1 : 0;
+    var cy = H * 0.60 - c.amount * 40 - gulp * 5;
+    var h = H * (0.52 + c.amount * 0.10) * (1 + gulp * 0.04);
+    R.handsSprite(ctx, 0, W / 2 + 46, t, { scale: 0.46, tap: 6 + c.amount * 30, bobAmt: 2, fast: true });
+    R.drinkBig(ctx, c.drink, W / 2, cy, h, -c.tilt, c.amount);
+    // foam/steam wisps on each gulp
+    if (gulp) for (var i = 0; i < 3; i++) { ctx.save(); ctx.globalAlpha = 0.5; R.circle(ctx, W / 2 + (Math.random() - 0.5) * 40, cy - h * 0.4 - Math.random() * 12, 2 + Math.random() * 2, "#fff"); ctx.restore(); }
+
+    // progress ring / bar
+    var bw = 150, bx = (W - bw) / 2, by = H * 0.14;
+    R.fillRR(ctx, bx - 3, by - 3, bw + 6, 16, 4, "rgba(20,12,6,.85)");
+    R.fillRR(ctx, bx, by, bw, 10, 3, "#2a1d12");
+    R.fillRR(ctx, bx, by, bw * c.amount, 10, 3, c.amount >= 1 ? "#7bd88a" : "#ffca55");
+    ctx.textAlign = "center"; ctx.font = "bold 11px 'Courier New',monospace";
+    ctx.fillStyle = "#f3e9da";
+    ctx.fillText(c.done ? "AHHHH!" : "CLICK / TAP FAST TO DRINK!", W / 2, by - 8);
+    ctx.textAlign = "left";
+    R.vignette(ctx);
+  }
 
   // bouncy little dev walking across the room floor (title screen)
   function walker(t) {

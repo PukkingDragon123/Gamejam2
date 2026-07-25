@@ -234,6 +234,16 @@
     { id: "coffee",       name: "Cold Brew",     icon: "coffee", base: 45, desc: "The deadline clock ticks slower." }
   ];
 
+  // Online drink shop (replaces the fridge). Buy with players, then
+  // chug it in a rapid-click minigame for the buff.
+  var SHOP = [
+    { id: "cola",    price: 40,  tag: "+30% players on your next ship",   fx: "shipMult" },
+    { id: "monster", price: 70,  tag: "clock runs 30% slower next game",  fx: "clockSlow" },
+    { id: "brew",    price: 55,  tag: "next game starts 4 chars typed",   fx: "preType" },
+    { id: "oj",      price: 30,  tag: "instant +80 players",              fx: "instant80" },
+    { id: "water",   price: 15,  tag: "instant +35 players",              fx: "instant35" }
+  ];
+
   var GAME = {
     shipTarget: 100,       // mash amount to ship
     mashPerHit: 8,         // build filled per button press
@@ -246,6 +256,7 @@
     KEYROWS: KEYROWS,
     SNIPPETS: SNIPPETS,
     UPGRADES: UPGRADES,
+    SHOP: SHOP,
     GAME: GAME,
     GEARS: GEARS,
     TYPES: TYPES,
