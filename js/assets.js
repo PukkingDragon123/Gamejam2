@@ -14,16 +14,18 @@
 
   // Files are pre-baked to transparent backgrounds (see scratch/bake), so no
   // runtime keying is needed — just load and (for sheets) slice.
+  // px = target pixel-grid size for that sprite (quantised at load so the
+  // whole game shares one chunky pixel resolution). levels = colour steps.
   var MANIFEST = [
-    { name: "hands",         src: "assets/hands.png",         sheet: { cols: 3, rows: 1 } }, // 0 idle,1 press,2 type
-    { name: "runbtn",        src: "assets/runbtn.png",        sheet: { cols: 2, rows: 1 } }, // 0 up,1 down
-    { name: "desk",          src: "assets/desk.png" },
+    { name: "hands",         src: "assets/hands.png",         sheet: { cols: 3, rows: 1 }, px: 90,  levels: 10 }, // 0 idle,1 press,2 type
+    { name: "runbtn",        src: "assets/runbtn.png",        sheet: { cols: 2, rows: 1 }, px: 56,  levels: 8 },  // 0 up,1 down
+    { name: "desk",          src: "assets/desk.png",          px: 256, levels: 24 },
     { name: "room",          src: "assets/room.gif" },
-    { name: "player",        src: "assets/player.png",        sheet: { cols: 4, rows: 2 } },
-    { name: "drinks",        src: "assets/drinks.png",        sheet: { cols: 5, rows: 1 } },
-    { name: "pack_gears",    src: "assets/pack_gears.png" },
-    { name: "pack_graphics", src: "assets/pack_graphics.png" },
-    { name: "pack_pets",     src: "assets/pack_pets.png" }
+    { name: "player",        src: "assets/player.png",        sheet: { cols: 4, rows: 2 }, px: 64,  levels: 8 },
+    { name: "drinks",        src: "assets/drinks.png",        sheet: { cols: 5, rows: 1 }, px: 56,  levels: 10 },
+    { name: "pack_gears",    src: "assets/pack_gears.png",    px: 72, levels: 10 },
+    { name: "pack_graphics", src: "assets/pack_graphics.png", px: 72, levels: 10 },
+    { name: "pack_pets",     src: "assets/pack_pets.png",     px: 72, levels: 10 }
   ];
 
   function toCanvas(img) {
@@ -65,6 +67,31 @@
     return canvas;
   }
 
+  // Quantise a canvas to a chunky pixel grid + a limited palette so every
+  // sprite reads as real hand-made pixel art at the same resolution
+  // (the source art is high-res and smooth, which is what looks "AI").
+  function pixelate(canvas, targetPx, levels) {
+    var w = canvas.width, h = canvas.height;
+    var scale = Math.max(1, Math.round(Math.max(w, h) / targetPx));
+    var sw = Math.max(1, Math.round(w / scale)), sh = Math.max(1, Math.round(h / scale));
+    var small = document.createElement("canvas"); small.width = sw; small.height = sh;
+    var sc = small.getContext("2d"); sc.imageSmoothingEnabled = false;
+    sc.drawImage(canvas, 0, 0, sw, sh);
+    // posterise colours a little (chunkier palette, crisper edges)
+    try {
+      var d = sc.getImageData(0, 0, sw, sh), p = d.data, step = 255 / (levels || 12);
+      for (var i = 0; i < p.length; i += 4) {
+        if (p[i + 3] < 110) { p[i + 3] = 0; continue; }   // harden alpha (no soft AI halo)
+        p[i + 3] = 255;
+        p[i] = Math.round(p[i] / step) * step;
+        p[i + 1] = Math.round(p[i + 1] / step) * step;
+        p[i + 2] = Math.round(p[i + 2] / step) * step;
+      }
+      sc.putImageData(d, 0, 0);
+    } catch (e) { /* ignore */ }
+    return small;   // drawn upscaled with smoothing off => crisp fat pixels
+  }
+
   function sliceSheet(canvas, cols, rows) {
     var cw = Math.floor(canvas.width / cols), ch = Math.floor(canvas.height / rows), out = [];
     for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
@@ -85,11 +112,12 @@
     var cv = toCanvas(img);
     if (spec.sheet) {
       var cells = sliceSheet(cv, spec.sheet.cols, spec.sheet.rows);
-      cells.forEach(function (c) { applyKey(c, spec); });   // key each cell (per-cell corner)
+      cells = cells.map(function (c) { applyKey(c, spec); return spec.px ? pixelate(c, spec.px, spec.levels) : c; });
       store[spec.name] = cells;
       meta[spec.name] = { ok: true, frames: cells.length, w: cells[0].width, h: cells[0].height };
     } else {
       applyKey(cv, spec);
+      if (spec.px) cv = pixelate(cv, spec.px, spec.levels);
       store[spec.name] = cv;
       meta[spec.name] = { ok: true, frames: 1, w: cv.width, h: cv.height };
     }

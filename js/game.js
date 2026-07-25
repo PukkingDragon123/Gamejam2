@@ -32,7 +32,7 @@
   // room hotspots, normalized to the room image (drawn "contain" on canvas)
   var ROOM = {
     computer: { x: 0.0, y: 0.40, w: 0.21, h: 0.32 },
-    standX: 0.16, floorY: 0.90, spawnX: 0.58, scale: 0.30, walk: 0.28
+    standX: 0.16, floorY: 0.90, spawnX: 0.58, scale: 0.42, walk: 0.28
   };
 
   // ---------------------------------------------------------
@@ -172,7 +172,9 @@
     var hop = pl.moving ? Math.abs(Math.sin(pl.animT * 9)) : 0;
     var breathe = pl.moving ? 0 : Math.sin((pl.idleT || 0) * 2.2) * 1.4;
     var frame = pl.moving ? (Math.floor(pl.animT / 0.16) % 2 ? "walkB" : "walkA") : "back";
-    R.contactShadow(ctx, pl.x, pl.feetY, 15, hop * 5);
+    R.contactShadow(ctx, pl.x, pl.feetY, 18, hop * 5);
+    // rim light so the character reads clearly against the dark room
+    ctx.save(); ctx.globalAlpha = 0.30; R.lightPool(ctx, pl.x, pl.feetY - hgt * 0.45, hgt * 0.75, "#ffd9a0", 0.30); ctx.restore();
     R.playerSprite(ctx, frame, pl.x, pl.feetY - hop * 4 + breathe, hgt * (1 + hop * 0.02), pl.facing === 1, t, "");
     // prompt
     if (hover || Math.abs(pl.x - R.roomMap(ROOM.standX, 0).x) < 40) {
@@ -474,10 +476,10 @@
       R.deskScene(ctx);
       // monitor keeps showing the finished code (aligned to the CRT)
       R.monitorCode(ctx, G.target, G.target.length, t, {});
-      // red button sits on the desk to the RIGHT of the monitor
-      var bx = W * 0.80, by = H * 0.60, squash = G.btn > 0 ? 1 : 0;
+      // red button sits on the DESK, fully clear of the monitor/tower
+      var bx = W * 0.80, by = H * 0.845, squash = G.btn > 0 ? 1 : 0;
       // build bar above the button
-      var barW = 120, barX = bx - barW / 2, barY = by - H * 0.30;
+      var barW = 120, barX = bx - barW / 2, barY = by - H * 0.20;
       ctx.fillStyle = "#ffca55"; ctx.font = "bold 11px 'Courier New',monospace"; ctx.textAlign = "center";
       var pulse = 1 + 0.06 * Math.sin(t * 14);
       ctx.save(); ctx.translate(bx, barY - 14); ctx.scale(pulse, pulse); ctx.fillText("MASH SPACE!", 0, 0); ctx.restore();
@@ -485,9 +487,10 @@
       R.fillRR(ctx, barX, barY, barW, 8, 2, "#241812");
       R.fillRR(ctx, barX, barY, barW * (G.build / GAME.shipTarget), 8, 2, "#5fe0a0");
       // the button (squashes when pressed)
-      R.runButton(ctx, bx, by, H * (0.30 - squash * 0.02), G.btn > 0, t);
-      // press hand reaches in from the bottom-right toward the button
-      R.handsSprite(ctx, 1, bx - 6, t, { scale: 0.6, tap: (G.btn > 0 ? 30 : 6), bobAmt: 2, fast: G.build > 0 });
+      // hand reaches in from the bottom-right FIRST so the button stays readable
+      R.handsSprite(ctx, 1, bx + 34, t, { scale: 0.42, tap: (G.btn > 0 ? 10 : -14), bobAmt: 2, fast: G.build > 0 });
+      R.contactShadow(ctx, bx, by + H * 0.07, 32, squash * 3);
+      R.runButton(ctx, bx, by, H * (0.24 - squash * 0.015), G.btn > 0, t);
       hud();
     } else {
       // title: bouncy walking dev in the room; itch: idle hands at the desk

@@ -775,40 +775,60 @@
     for (var i = 0; i < keys.length; i++) if (keys[i].char === up || keys[i].char === ch) return keys[i];
     return null;
   }
-  // Fat, cozy ivory keycaps with chunky 3D depth.
+  // Chunky mechanical keyboard: dark charcoal caps, amber legends,
+  // deep sculpted sides. Drawn on a fixed pixel grid so it matches the art.
   function keyboard(ctx, opts) {
     opts = opts || {};
-    var kb = keyboardLayout(), nextK = opts.next ? keyForChar(opts.next) : null, pressed = opts.pressed || {}, t = opts.t || 0;
-    var reg = kb.region;
-    // wooden/cream deck tray
-    fillRR(ctx, reg.x - 10, reg.y - 9, reg.w + 20, reg.h + 20, 8, "#2a1d13");
-    fillRR(ctx, reg.x - 7, reg.y - 7, reg.w + 14, reg.h + 15, 7, "#6a5136");
-    fillRR(ctx, reg.x - 7, reg.y - 7, reg.w + 14, 5, 7, "#8a6f4a");
-    var depth = 8;
+    var kb = keyboardLayout(), nextK = opts.next ? keyForChar(opts.next) : null,
+        pressed = opts.pressed || {}, t = opts.t || 0, reg = kb.region;
+    var U = 2;                                  // pixel unit (everything snaps to this)
+    function snap(v) { return Math.round(v / U) * U; }
+
+    // ---- case ----
+    var cx0 = snap(reg.x - 10), cy0 = snap(reg.y - 9),
+        cw = snap(reg.w + 20), ch = snap(reg.h + 20);
+    px(ctx, cx0, cy0 + 4, cw, ch, "#161009");                 // drop shadow / underside
+    px(ctx, cx0, cy0, cw, ch - 4, "#3b2f24");                 // case body
+    px(ctx, cx0, cy0, cw, U * 2, "#5e4c3a");                  // top bevel light
+    px(ctx, cx0, cy0 + ch - 8, cw, U * 2, "#241b13");         // bottom bevel dark
+    px(ctx, cx0, cy0, U * 2, ch - 4, "#4c3d2e");              // left edge
+    px(ctx, cx0 + cw - U * 2, cy0, U * 2, ch - 4, "#241b13"); // right edge
+    // recessed plate the caps sit in
+    px(ctx, cx0 + U * 3, cy0 + U * 3, cw - U * 6, ch - U * 8, "#221a12");
+
+    var depth = U * 4;
     kb.keys.forEach(function (key) {
-      var down = pressed[key.char] > 0 ? depth - 1 : 0;
-      var isNext = nextK && nextK === key;
-      var kx = key.x, ky = key.y, kw = key.w, kh = key.h - depth;
-      // base / side (the chunky depth block)
-      fillRR(ctx, kx, ky + kh - 2, kw, depth + 4, 4, "#5a4026");
-      fillRR(ctx, kx, ky + kh + depth - 2 - down, kw, 3, 3, "#3a2818");
-      // keycap top (ivory), depresses when down
-      var topY = ky + down;
-      var capTop = isNext ? "#ffe6a0" : "#f0e6cf";
-      var capBot = isNext ? "#e0b24d" : "#c9b78e";
-      var g = ctx.createLinearGradient(0, topY, 0, topY + kh);
-      g.addColorStop(0, capTop); g.addColorStop(1, capBot);
-      ctx.fillStyle = g; rr(ctx, kx, topY, kw, kh, 4); ctx.fill();
-      // dish highlight + inner shade
-      ctx.globalAlpha = 0.55; fillRR(ctx, kx + 2, topY + 2, kw - 4, kh * 0.34, 3, "#fffaf0"); ctx.globalAlpha = 1;
-      ctx.strokeStyle = shade(capBot, -0.25); ctx.lineWidth = 1; rr(ctx, kx + 0.5, topY + 0.5, kw - 1, kh - 1, 4); ctx.stroke();
+      var isNext = nextK && nextK === key, down = pressed[key.char] > 0;
+      var kx = snap(key.x), kw = snap(key.w), kh = snap(key.h - depth);
+      var ky = snap(key.y) + (down ? U : 0);
+
+      // sculpted side walls (the "chunky" part)
+      px(ctx, kx, ky + kh - U, kw, depth, "#120c07");
+      px(ctx, kx + U, ky + kh - U, kw - U * 2, depth - U, "#2a2118");
+
+      // cap face
+      var face = isNext ? "#6a5220" : "#40352a";
+      var top  = isNext ? "#a8822c" : "#5a4c3c";
+      var low  = isNext ? "#4a3714" : "#2e2419";
+      px(ctx, kx, ky, kw, kh, face);
+      px(ctx, kx, ky, kw, U, top);                       // lit top edge
+      px(ctx, kx, ky + kh - U, kw, U, low);              // shaded bottom edge
+      px(ctx, kx, ky, U, kh, shade(face, 0.18));         // left highlight
+      px(ctx, kx + kw - U, ky, U, kh, low);              // right shade
+      // dished centre
+      px(ctx, kx + U * 2, ky + U, kw - U * 4, U, shade(face, 0.12));
+
       if (isNext) {
-        ctx.strokeStyle = "#ff9a3d"; ctx.lineWidth = 2; rr(ctx, kx - 0.5, topY - 0.5, kw + 1, kh + 1, 4); ctx.stroke();
-        ctx.save(); ctx.globalAlpha = 0.25 + 0.18 * Math.sin(t * 8); circle(ctx, kx + kw / 2, topY + kh / 2, kw * 0.6, "#ffca55"); ctx.restore();
+        ctx.save(); ctx.globalAlpha = 0.20 + 0.14 * Math.sin(t * 9);
+        px(ctx, kx - U, ky - U, kw + U * 2, kh + U * 2, "#ffca55"); ctx.restore();
       }
-      // label (dark, engraved look)
-      ctx.fillStyle = isNext ? "#7a4a12" : "#7c6a4a"; ctx.font = "bold 7px 'Courier New',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText(key.label === "SPACE" ? "___" : key.label, kx + kw / 2, topY + kh / 2 + 1);
+
+      // legend
+      ctx.fillStyle = isNext ? "#ffe9b0" : "#a2907a";
+      ctx.font = "bold 7px 'Courier New',monospace";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(key.label === "SPACE" ? "" : key.label, snap(kx + kw / 2), snap(ky + kh / 2) + 1);
+      if (key.label === "SPACE") px(ctx, kx + kw * 0.35, ky + kh / 2, kw * 0.3, U, "#a2907a");
     });
     ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   }
