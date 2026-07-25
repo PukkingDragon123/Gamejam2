@@ -670,6 +670,27 @@
     return { x: s.x * W, y: s.y * H, w: s.w * W, h: s.h * H };
   }
 
+  // ---- room hub background (room.gif, drawn "contain" with warm bars) ----
+  var _roomRect = null;
+  function roomCanvas(ctx) {
+    var g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#241a12"); g.addColorStop(1, "#140d09");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    var A = AS();
+    if (A && A.has("room")) {
+      var img = A.get("room"), s = Math.min(W / img.width, H / img.height);
+      var dw = img.width * s, dh = img.height * s, dx = (W - dw) / 2, dy = (H - dh) / 2;
+      ctx.imageSmoothingEnabled = false; ctx.drawImage(img, dx, dy, dw, dh);
+      _roomRect = { x: dx, y: dy, w: dw, h: dh };
+    } else {
+      _roomRect = { x: 0, y: H * 0.12, w: W, h: H * 0.76 };
+      px(ctx, _roomRect.x, _roomRect.y, _roomRect.w, _roomRect.h, "#3a2a20");
+      px(ctx, _roomRect.x, _roomRect.y + _roomRect.h * 0.62, _roomRect.w, _roomRect.h * 0.38, "#4a3628");
+    }
+    return _roomRect;
+  }
+  function roomMap(nx, ny) { var r = _roomRect || { x: 0, y: 0, w: W, h: H }; return { x: r.x + nx * r.w, y: r.y + ny * r.h }; }
+  function roomRect() { return _roomRect || { x: 0, y: 0, w: W, h: H }; }
+
   // ---- desk scene background ----
   function deskScene(ctx) {
     var A = AS();
@@ -888,6 +909,7 @@
     drinkCan: drinkCan, boosterPack: boosterPack, character: character,
     room: room, panel: panel,
     roomScene: roomScene, playerSprite: playerSprite, drinkSprite: drinkSprite, packSprite: packSprite, packRip: packRip,
+    roomCanvas: roomCanvas, roomMap: roomMap, roomRect: roomRect,
     screenRect: screenRect, deskScene: deskScene, monitorCode: monitorCode,
     keyboardLayout: keyboardLayout, keyForChar: keyForChar, keyboard: keyboard,
     handsSprite: handsSprite, runButton: runButton, upgradeIcon: upgradeIcon, peopleIcon: peopleIcon, keyGlow: keyGlow, vignette: vignette

@@ -21,8 +21,18 @@
     pressed: {}, tick: 0,
     // ship mash
     build: 0, btn: 0,
+    // room hub
+    player: { x: 0, feetY: 0, target: null, facing: 1, moving: false, animT: 0, intend: false },
+    // drink buffs (consumed at the next coding session)
+    buff: { shipMult: 1, clockSlow: 1, preType: 0 }, buffName: "",
     // fx
     pops: [], shake: 0, handTap: 0, t: 0, lastGain: 0
+  };
+
+  // room hotspots, normalized to the room image (drawn "contain" on canvas)
+  var ROOM = {
+    computer: { x: 0.0, y: 0.40, w: 0.21, h: 0.32 },
+    standX: 0.16, floorY: 0.90, spawnX: 0.58, scale: 0.30, walk: 0.28
   };
 
   // ---------------------------------------------------------
@@ -47,6 +57,7 @@
     if (els.roombg) els.roombg.classList.add("hidden");
 
     canvas.addEventListener("pointerdown", onDown);
+    canvas.addEventListener("pointermove", onMove);
     window.addEventListener("keydown", onKey);
     window.addEventListener("pointerdown", function () { A.unlock(); }, { once: true });
     if (els.muteBtn) els.muteBtn.addEventListener("click", function () { els.muteBtn.textContent = A.toggleMute() ? "🔇" : "🔊"; });
@@ -66,9 +77,21 @@
     return { x: (e.clientX - r.left - (r.width - W * sc) / 2) / sc, y: (e.clientY - r.top - (r.height - H * sc) / 2) / sc };
   }
 
+  function onMove(e) {
+    if (G.state !== "room") return;
+    var p = toXY(e), cz = computerRectC();
+    G.hoverComputer = (p.x >= cz.x && p.x <= cz.x + cz.w && p.y >= cz.y && p.y <= cz.y + cz.h);
+  }
+
   function onDown(e) {
     if (e.cancelable) e.preventDefault();
     var p = toXY(e);
+    if (G.state === "room") {
+      var cz = computerRectC();
+      if (p.x >= cz.x && p.x <= cz.x + cz.w && p.y >= cz.y && p.y <= cz.y + cz.h) { G.player.target = R.roomMap(ROOM.standX, 0).x; G.player.intend = true; }
+      else { G.player.target = Math.max(20, Math.min(W - 20, p.x)); G.player.intend = false; }
+      return;
+    }
     if (G.state === "code") {
       // tapping an on-screen key types it (this is the mobile/touch input path)
       var keys = R.keyboardLayout().keys;
@@ -98,10 +121,116 @@
     var idx = G.shipped % SNIPPETS.length;
     // pick a snippet scaling roughly with progress
     G.target = SNIPPETS[(idx + Math.floor(G.shipped / SNIPPETS.length) * 3) % SNIPPETS.length];
-    var pre = Math.min(G.upg.autocomplete * 2, G.target.length - 1);
+    var pre = Math.min(G.upg.autocomplete * 2 + (G.buff.preType || 0), G.target.length - 1);
+    G.buff.preType = 0;                                  // brew buff is one-shot
     G.typedLen = pre; G.mistakes = 0; G.mistakeFlash = 0; G.typeTime = 0; G.typing = false;
     G.pressed = {}; G.state = "code";
     hideOverlay();
+  }
+
+  // =========================================================
+  //  ROOM HUB (walk to the computer)
+  // =========================================================
+  function enterRoom() {
+    G.state = "room"; hideOverlay();
+    R.roomCanvas(ctx);                                  // establish the room rect
+    var rr = R.roomRect();
+    G.player.feetY = R.roomMap(0, ROOM.floorY).y;
+    G.player.x = R.roomMap(ROOM.spawnX, 0).x;
+    G.player.target = null; G.player.intend = false; G.player.moving = false;
+  }
+  function updateRoom(dt) {
+    var pl = G.player, rr = R.roomRect();
+    if (pl.target != null) {
+      var dx = pl.target - pl.x, spd = ROOM.walk * rr.w * dt;
+      if (Math.abs(dx) <= spd) { pl.x = pl.target; pl.target = null; pl.moving = false; if (pl.intend) { pl.intend = false; openDesktop(); } }
+      else { pl.x += Math.sign(dx) * spd; pl.facing = dx < 0 ? -1 : 1; pl.moving = true; pl.animT += dt; }
+    } else pl.moving = false;
+  }
+  function computerRectC() {
+    var a = R.roomMap(ROOM.computer.x, ROOM.computer.y), rr = R.roomRect();
+    return { x: a.x, y: a.y, w: ROOM.computer.w * rr.w, h: ROOM.computer.h * rr.h };
+  }
+  function renderRoom(t) {
+    R.roomCanvas(ctx);
+    var cz = computerRectC(), pl = G.player, hgt = ROOM.scale * R.roomRect().h;
+    var hover = G.hoverComputer;
+    if (hover) { ctx.save(); ctx.strokeStyle = "#ffe08a"; ctx.lineWidth = 2; ctx.globalAlpha = 0.5 + 0.35 * Math.sin(t * 6); R.rr(ctx, cz.x + 2, cz.y, cz.w - 4, cz.h, 6); ctx.stroke(); ctx.restore(); }
+    var frame = pl.moving ? (Math.floor(pl.animT / 0.18) % 2 ? "walkB" : "walkA") : "back";
+    // ground shadow + hop
+    ctx.save(); ctx.globalAlpha = 0.28; ctx.beginPath(); ctx.ellipse(pl.x, pl.feetY, 14, 4, 0, 0, 6.28); ctx.fillStyle = "#000"; ctx.fill(); ctx.restore();
+    R.playerSprite(ctx, frame, pl.x, pl.feetY, hgt, pl.facing === 1, t, "");
+    // prompt
+    if (hover || Math.abs(pl.x - R.roomMap(ROOM.standX, 0).x) < 40) {
+      ctx.save(); ctx.textAlign = "center";
+      R.fillRR(ctx, cz.x + cz.w / 2 - 48, cz.y - 18, 96, 15, 4, "rgba(24,16,10,.9)");
+      ctx.font = "bold 9px 'Courier New',monospace"; ctx.fillStyle = "#ffca55";
+      ctx.fillText("▸ CLICK TO WORK", cz.x + cz.w / 2, cz.y - 7); ctx.restore();
+    }
+    // hint bar
+    ctx.textAlign = "center"; ctx.font = "8px 'Courier New',monospace"; ctx.fillStyle = "#b8a48e";
+    ctx.fillText("click to walk · click the computer to start working", W / 2, H - 8);
+    ctx.textAlign = "left";
+    hud();
+  }
+
+  // =========================================================
+  //  DESKTOP (GearOS apps)
+  // =========================================================
+  function openDesktop() {
+    G.state = "desktop";
+    var apps = [
+      { id: "engine", icon: "🖥️", name: "GearEngine" },
+      { id: "fridge", icon: "🧊", name: "Fridge" },
+      { id: "net", icon: "🌐", name: "GameJamNet" },
+      { id: "trash", icon: "🗑️", name: "Recycle" }
+    ];
+    var icons = apps.map(function (a) { return '<button class="dk-icon" data-app="' + a.id + '"><span class="dk-emoji">' + a.icon + '</span><span class="dk-label">' + a.name + '</span></button>'; }).join("");
+    overlay('<div class="desktop"><div class="dk-wall"><div class="dk-logo">GearOS<span>95</span></div><div class="dk-icons">' + icons + '</div></div>' +
+      '<div class="dk-taskbar"><button class="dk-start">▚ Start</button><span class="dk-hint">Open <b>GearEngine</b> to make a game · <b>Fridge</b> for a drink</span><span class="dk-clock">👥 ' + fmt(G.players) + '</span></div></div>');
+    var wrap = els.overlay.querySelector(".desktop");
+    wrap.querySelectorAll(".dk-icon").forEach(function (btn) { btn.onclick = function () { A.sfx.ui(); onDesktopApp(btn.getAttribute("data-app")); }; });
+    wrap.querySelector(".dk-start").onclick = function () { A.sfx.ui(); onDesktopApp("engine"); };
+  }
+  function onDesktopApp(id) {
+    if (id === "engine") { A.sfx.select(); startCode(); return; }
+    if (id === "fridge") { A.sfx.ui(); openDrinks(); return; }
+    var win = { net: "🌐 GameJamNet<br><i>“day one and someone already has a vertical slice??”</i><br>(do NOT read the comments.)", trash: "🗑️ Recycle Bin<br>0 items. You never delete anything." }[id] || "…";
+    var w = document.createElement("div"); w.className = "dk-window";
+    w.innerHTML = '<div class="dk-titlebar"><span>' + id + '.exe</span><button class="dk-x">✕</button></div><div class="dk-body">' + win + '</div>';
+    els.overlay.querySelector(".desktop").appendChild(w);
+    w.querySelector(".dk-x").onclick = function () { w.remove(); };
+  }
+
+  // =========================================================
+  //  DRINKS (a buff for your next coding session)
+  // =========================================================
+  var DRINK_FX = {
+    cola:    { text: "+30% players next ship", apply: function () { G.buff.shipMult = 1.3; }, tag: "🔥" },
+    monster: { text: "clock 30% slower next game", apply: function () { G.buff.clockSlow = 0.7; }, tag: "🐌" },
+    brew:    { text: "next game starts 4 chars typed", apply: function () { G.buff.preType = 4; }, tag: "⌨" },
+    oj:      { text: "+60 players right now", apply: function () { G.players += 60; }, tag: "💰" },
+    water:   { text: "refreshing: +25 players", apply: function () { G.players += 25; }, tag: "💧" }
+  };
+  function openDrinks() {
+    G.state = "drinks";
+    var html = '<div class="drinks-modal itch"><h1 style="text-align:center;color:#ffca55">🧊 FRIDGE</h1><p style="text-align:center;color:#b8a48e">Grab a drink for a boost on your next game.</p><div class="drinks-row" id="drinks-row"></div><button class="big-btn" id="ov-btn">↩ Back to desktop</button></div>';
+    overlay(html);
+    var row = document.getElementById("drinks-row");
+    global.JamData.DRINKS.forEach(function (d) {
+      var fx = DRINK_FX[d.id] || { text: d.blurb, apply: function () { }, tag: "" };
+      var div = document.createElement("div"); div.className = "drink";
+      var cv = document.createElement("canvas"); cv.width = 56; cv.height = 78; var cc = cv.getContext("2d"); cc.imageSmoothingEnabled = false;
+      R.drinkSprite(cc, d, 28, 40, 72); div.appendChild(cv);
+      var nm = document.createElement("div"); nm.className = "d-name"; nm.textContent = d.name; div.appendChild(nm);
+      var ef = document.createElement("div"); ef.className = "d-energy"; ef.textContent = fx.tag + " " + fx.text; div.appendChild(ef);
+      div.onclick = function () { chooseDrink(d, fx); };
+      row.appendChild(div);
+    });
+    document.getElementById("ov-btn").onclick = function () { A.sfx.ui(); openDesktop(); };
+  }
+  function chooseDrink(d, fx) {
+    A.sfx.sip(); fx.apply(); G.buffName = d.name + " — " + fx.text; openDesktop();
   }
 
   function typeChar(ch) {
@@ -137,7 +266,9 @@
     var par = G.target.length * 0.35 * (1 + G.upg.coffee * 0.15);
     var speed = Math.max(0.5, Math.min(2.5, par / Math.max(0.5, G.typeTime)));
     var base = 10 + G.shipped * 4 + G.target.length * 0.5;
-    var mult = 1 + G.upg.viral * 0.5;
+    var mult = (1 + G.upg.viral * 0.5) * (G.buff.shipMult || 1);
+    G.buff.shipMult = 1;                                 // cola buff is one-shot
+    G.buff.clockSlow = 1;                                // monster buff lasted this game
     var gain = Math.max(1, Math.round(base * speed * mult));
     G.lastGain = gain; G.players += gain; G.shipped++;
     A.sfx.win(); G.shake = 8;
@@ -161,8 +292,10 @@
       '<div class="itch-sub">just shipped! +' + gain + ' players ' + (speed >= 1.6 ? "⚡ SPEED BONUS!" : "") + '</div>' +
       '<div class="itch-rate">📈 +' + perSecNow().toFixed(1) + ' players/sec</div></div></div>' +
       '<div class="up-title">UPGRADES</div><div class="up-grid" id="up-grid"></div>' +
-      '<button class="big-btn" id="ov-btn">⌨ Make next game →</button></div>';
+      (G.buffName ? '<p class="itch-rate" style="text-align:center">🥤 active: ' + G.buffName + '</p>' : '') +
+      '<div class="itch-btns"><button class="big-btn alt" id="ov-break">🚪 Take a break</button><button class="big-btn" id="ov-btn">⌨ Make next game →</button></div></div>';
     overlay(html);
+    var brk = document.getElementById("ov-break"); if (brk) brk.onclick = function () { A.sfx.ui(); enterRoom(); };
     // thumb
     var thumb = document.getElementById("itch-thumb");
     var tc = document.createElement("canvas"); tc.width = 96; tc.height = 72; var tx = tc.getContext("2d");
@@ -203,10 +336,10 @@
     G.state = "title";
     overlay('<div class="modal cozy"><h1>⌨ GAME JAM<br>SIMULATOR</h1>' +
       '<p class="lead">Type the code. Ship the game. Watch the players roll in.</p>' +
-      '<p>Follow the glowing keys and <b>type fast</b> — the clock is ticking. Then <b>mash the red button</b> to ship it, and spend your players on <b>upgrades</b>.</p>' +
-      '<button class="big-btn" id="ov-btn">▶ START CODING</button></div>');
+      '<p>Walk to your computer and open <b>GearEngine</b>. Follow the glowing keys and <b>type fast</b> — the clock is ticking. <b>Mash the red button</b> to ship, grab a <b>drink</b> from the fridge for a boost, and spend players on <b>upgrades</b>.</p>' +
+      '<button class="big-btn" id="ov-btn">▶ ENTER THE ROOM</button></div>');
     els.overlay.classList.add("title-mode");
-    document.getElementById("ov-btn").onclick = function () { A.sfx.ui(); G.players = 0; G.shipped = 0; G.upg = { autocomplete: 0, marketing: 0, viral: 0, coffee: 0 }; startCode(); };
+    document.getElementById("ov-btn").onclick = function () { A.sfx.ui(); G.players = 0; G.shipped = 0; G.upg = { autocomplete: 0, marketing: 0, viral: 0, coffee: 0 }; enterRoom(); };
   }
 
   // =========================================================
@@ -222,13 +355,15 @@
   function update(dt, t) {
     G.t = t;
     // idle players income (always ticking once playing)
-    if (G.state === "code" || G.state === "ship" || G.state === "itch") {
+    if (G.state !== "title" && G.state !== "boot") {
       G.players += perSecNow() * dt;
       if (G.state === "itch") { var el = document.getElementById("itch-count"); if (el) el.textContent = fmt(G.players); renderAfford(); }
     }
-    // typing clock
+    // room walking
+    if (G.state === "room") updateRoom(dt);
+    // typing clock (slowed by the Monster buff)
     if (G.state === "code" && G.typing) {
-      var before = Math.floor(G.typeTime); G.typeTime += dt;
+      var before = Math.floor(G.typeTime); G.typeTime += dt * (G.buff.clockSlow || 1);
       if (Math.floor(G.typeTime) !== before) A.sfx.timerLow();
     }
     // decays
@@ -251,9 +386,13 @@
     ctx.save();
     if (G.shake) ctx.translate((Math.random() - 0.5) * G.shake, (Math.random() - 0.5) * G.shake);
 
-    R.deskScene(ctx);
-
-    if (G.state === "code") {
+    if (G.state === "room") {
+      renderRoom(t);
+    } else if (G.state === "desktop" || G.state === "drinks") {
+      R.roomCanvas(ctx);
+      ctx.save(); ctx.globalAlpha = 0.45; ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H); ctx.restore();
+    } else if (G.state === "code") {
+      R.deskScene(ctx);
       R.monitorCode(ctx, G.target, G.typedLen, t, { mistake: Math.max(0, G.mistakeFlash) });
       R.keyboard(ctx, { next: G.target[G.typedLen], pressed: G.pressed, t: t });
       R.handsSprite(ctx, 2, W / 2, t, { scale: 0.55, tap: G.handTap * 90, bobAmt: 2.5 });
@@ -261,6 +400,7 @@
       bigClock(t);
       hud();
     } else if (G.state === "ship") {
+      R.deskScene(ctx);
       // monitor keeps showing the finished code (aligned to the CRT)
       R.monitorCode(ctx, G.target, G.target.length, t, {});
       // red button sits on the desk to the RIGHT of the monitor
@@ -279,9 +419,9 @@
       R.handsSprite(ctx, 1, bx - 6, t, { scale: 0.6, tap: (G.btn > 0 ? 30 : 6), bobAmt: 2, fast: G.build > 0 });
       hud();
     } else {
-      // title: a bouncy walking dev along the desk; itch: idle hands
-      if (G.state === "title") walker(t);
-      else R.handsSprite(ctx, 0, W / 2, t, { scale: 0.5, bobAmt: 3 });
+      // title: bouncy walking dev in the room; itch: idle hands at the desk
+      if (G.state === "title") { R.roomCanvas(ctx); walker(t); }
+      else { R.deskScene(ctx); R.handsSprite(ctx, 0, W / 2, t, { scale: 0.5, bobAmt: 3 }); }
     }
 
     // pops
@@ -322,14 +462,14 @@
 
   function pop(x, y, txt, color, size) { G.pops.push({ x: x, y: y, txt: txt, color: color, size: size || 14, life: 0.9, vy: -30 }); }
 
-  // bouncy little dev walking across the desk edge (title screen)
+  // bouncy little dev walking across the room floor (title screen)
   function walker(t) {
-    var speed = 52, period = W + 140, x = ((t * speed) % period) - 70, feetY = H * 0.955;
+    var rr = R.roomRect(), speed = rr.w * 0.1, period = rr.w + 120;
+    var x = rr.x - 50 + ((t * speed) % period), feetY = R.roomMap(0, ROOM.floorY).y;
     var hop = Math.abs(Math.sin(t * 6)), bob = -hop * 8;
-    // shadow (shrinks on the up-beat)
-    ctx.save(); ctx.globalAlpha = 0.28 - hop * 0.14; ctx.beginPath(); ctx.ellipse(x, feetY, 16 - hop * 4, 4.5, 0, 0, 6.28); ctx.fillStyle = "#000"; ctx.fill(); ctx.restore();
+    ctx.save(); ctx.globalAlpha = 0.28 - hop * 0.14; ctx.beginPath(); ctx.ellipse(x, feetY, 15 - hop * 4, 4.5, 0, 0, 6.28); ctx.fillStyle = "#000"; ctx.fill(); ctx.restore();
     var frame = (Math.floor(t * 6) % 2) ? "walkB" : "walkA";
-    R.playerSprite(ctx, frame, x, feetY + bob, H * 0.34, true, t, "");
+    R.playerSprite(ctx, frame, x, feetY + bob, rr.h * ROOM.scale, true, t, "");
   }
 
   // =========================================================

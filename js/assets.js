@@ -18,6 +18,7 @@
     { name: "hands",         src: "assets/hands.png",         sheet: { cols: 3, rows: 1 } }, // 0 idle,1 press,2 type
     { name: "runbtn",        src: "assets/runbtn.png",        sheet: { cols: 2, rows: 1 } }, // 0 up,1 down
     { name: "desk",          src: "assets/desk.png" },
+    { name: "room",          src: "assets/room.gif" },
     { name: "player",        src: "assets/player.png",        sheet: { cols: 4, rows: 2 } },
     { name: "drinks",        src: "assets/drinks.png",        sheet: { cols: 5, rows: 1 } },
     { name: "pack_gears",    src: "assets/pack_gears.png" },
