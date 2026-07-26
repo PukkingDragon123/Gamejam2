@@ -756,16 +756,25 @@
 
   // ---- interactive pixel keyboard ----
   var _kb = null;
+  // Real keyboard geometry: staggered rows, wide modifiers, proper spacebar.
   function keyboardLayout() {
     if (_kb) return _kb;
     var reg = { x: L.keyboard.x * W, y: L.keyboard.y * H, w: L.keyboard.w * W, h: L.keyboard.h * H };
     var rows = global.JamData.KEYROWS, keys = [];
-    var gap = 3, kh = reg.h / rows.length - gap;
-    for (var r = 0; r < rows.length; r++) {
+    var gap = 2, n = rows.length, kh = (reg.h - gap * (n - 1)) / n;
+    // unit width based on the longest row (10 keys) + room for stagger
+    var unit = (reg.w - gap * 10) / 10.6;
+    var indent = [0, 0.30, 0.55, 0.95, 0.25, 0];   // per-row stagger, like a real board
+    for (var r = 0; r < n; r++) {
       var y = reg.y + r * (kh + gap);
-      if (rows[r] === "_SPACE_") { var sw = reg.w * 0.52; keys.push({ label: "SPACE", char: " ", x: reg.x + (reg.w - sw) / 2, y: y, w: sw, h: kh }); continue; }
-      var chars = rows[r], n = chars.length, kw = reg.w / 10.4 - gap, rowW = n * (kw + gap) - gap, sx = reg.x + (reg.w - rowW) / 2;
-      for (var k = 0; k < n; k++) keys.push({ label: chars[k], char: chars[k], x: sx + k * (kw + gap), y: y, w: kw, h: kh });
+      if (rows[r] === "_SPACE_") {
+        var sw = unit * 5.2 + gap * 4;
+        keys.push({ label: "SPACE", char: " ", x: reg.x + (reg.w - sw) / 2, y: y, w: sw, h: kh });
+        continue;
+      }
+      var chars = rows[r], m = chars.length;
+      var sx = reg.x + (indent[r] || 0) * unit;
+      for (var k = 0; k < m; k++) keys.push({ label: chars[k], char: chars[k], x: sx + k * (unit + gap), y: y, w: unit, h: kh });
     }
     _kb = { region: reg, keys: keys };
     return _kb;
@@ -777,6 +786,7 @@
     for (var i = 0; i < keys.length; i++) if (keys[i].char === up || keys[i].char === ch) return keys[i];
     return null;
   }
+
   // Chunky mechanical keyboard: dark charcoal caps, amber legends,
   // deep sculpted sides. Drawn on a fixed pixel grid so it matches the art.
   function keyboard(ctx, opts) {

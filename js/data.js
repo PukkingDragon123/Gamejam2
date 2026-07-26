@@ -19,7 +19,7 @@
     // monitor screen region (normalized) — desk art is drawn "cover"
     screen: { x: 0.335, y: 0.145, w: 0.245, h: 0.315 },
     // on-screen keyboard region — big, tall, unmissable on phones
-    keyboard: { x: 0.055, y: 0.545, w: 0.89, h: 0.40 }
+    keyboard: { x: 0.135, y: 0.655, w: 0.73, h: 0.30 }
   };
 
   // Interactive keyboard rows (labels). SPACE handled specially.

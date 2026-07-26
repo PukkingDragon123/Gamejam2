@@ -26,7 +26,8 @@
     // drink buffs (consumed at the next coding session)
     buff: { shipMult: 1, clockSlow: 1, preType: 0 }, buffName: "",
     // fx
-    pops: [], shake: 0, handTap: 0, t: 0, lastGain: 0
+    pops: [], shake: 0, handTap: 0, t: 0, lastGain: 0,
+    deadline: 300, level: 1
   };
 
   // room hotspots, normalized to the room image (drawn "contain" on canvas)
@@ -122,14 +123,27 @@
   //  TYPING
   // =========================================================
   function startCode() {
-    var idx = G.shipped % SNIPPETS.length;
-    // pick a snippet scaling roughly with progress
-    G.target = SNIPPETS[(idx + Math.floor(G.shipped / SNIPPETS.length) * 3) % SNIPPETS.length];
+    // difficulty ramps: more lines, longer snippets as you ship more
+    G.level = 1 + Math.floor(G.shipped / 2);
+    var lines = Math.min(4, 1 + Math.floor(G.shipped / 2));
+    var pool = SNIPPETS.slice(0, Math.min(SNIPPETS.length, 5 + G.shipped * 2));
+    G.lines = []; G.lineIdx = 0;
+    for (var i = 0; i < lines; i++) G.lines.push(pool[(G.shipped * 3 + i * 5) % pool.length]);
+    G.target = G.lines[0];
     var pre = Math.min(G.upg.autocomplete * 2 + (G.buff.preType || 0), G.target.length - 1);
-    G.buff.preType = 0;                                  // brew buff is one-shot
+    G.buff.preType = 0;
     G.typedLen = pre; G.mistakes = 0; G.mistakeFlash = 0; G.typeTime = 0; G.typing = false;
     G.pressed = {}; G.state = "code";
     hideOverlay();
+  }
+
+  // called when the current line is finished
+  function nextLine() {
+    G.lineIdx++;
+    if (G.lineIdx >= G.lines.length) { startShip(); return; }
+    G.target = G.lines[G.lineIdx]; G.typedLen = 0;
+    A.sfx.cash(); pop(W / 2, H * 0.32, "LINE " + (G.lineIdx + 1) + "/" + G.lines.length, "#7bd88a", 16);
+    G.shake = Math.max(G.shake, 4);
   }
 
   // =========================================================
@@ -196,43 +210,36 @@
   // =========================================================
   function openDesktop() {
     G.state = "desktop";
-    var apps = [
-      { id: "engine", name: "GearEngine" },
-      { id: "shop", name: "DrinkMart" },
-      { id: "net", name: "GameJamNet" },
-      { id: "trash", name: "Recycle" }
-    ];
-    var icons = apps.map(function (a) {
-      return '<button class="dk-icon" data-app="' + a.id + '"><canvas class="dk-ico" width="48" height="48" data-icon="' + a.id + '"></canvas><span class="dk-label">' + a.name + '</span></button>';
-    }).join("");
-    overlay('<div class="desktop"><div class="dk-wall"><div class="dk-logo">GearOS<span>95</span></div><div class="dk-icons">' + icons + '</div></div>' +
-      '<div class="dk-taskbar"><button class="dk-start">Start</button><span class="dk-hint">Open <b>GearEngine</b> to make a game · <b>DrinkMart</b> to order a drink</span><span class="dk-clock" id="dk-players"></span></div></div>');
-    var wrap = els.overlay.querySelector(".desktop");
-    // draw the hand-made pixel icons
-    wrap.querySelectorAll(".dk-ico").forEach(function (cv) {
-      var c = cv.getContext("2d"); c.imageSmoothingEnabled = false;
-      R.desktopIcon(c, cv.getAttribute("data-icon"), 24, 24, 40);
-    });
+    overlay('<div class="desktop">' +
+      '<div class="dk-wall">' +
+        '<div class="dk-clockbig" id="dk-clockbig">--:--</div>' +
+        '<div class="dk-sub">deadline</div>' +
+        '<button class="work-btn" id="dk-work">START WORKING</button>' +
+        '<button class="pad-btn" id="dk-pad">order food &amp; drinks</button>' +
+      '</div>' +
+      '<div class="dk-taskbar"><span class="dk-brand">GearOS</span>' +
+      '<span class="dk-clock" id="dk-players"></span></div></div>');
     playersChip(document.getElementById("dk-players"));
-    wrap.querySelectorAll(".dk-icon").forEach(function (btn) { btn.onclick = function () { A.sfx.ui(); onDesktopApp(btn.getAttribute("data-app")); }; });
-    wrap.querySelector(".dk-start").onclick = function () { A.sfx.ui(); onDesktopApp("engine"); };
+    tickDeadline();
+    document.getElementById("dk-work").onclick = function () { A.sfx.select(); startCode(); };
+    document.getElementById("dk-pad").onclick = function () { A.sfx.ui(); openShop(); };
   }
 
   // small "players" chip with the pixel icon (reused across screens)
   function playersChip(host) {
     if (!host) return;
     host.innerHTML = '<canvas width="20" height="20"></canvas><b>' + fmt(G.players) + '</b>';
-    var cv = host.querySelector("canvas"); R.peopleIcon(cv.getContext("2d"), 10, 11, 15);
+    var cv = host.querySelector("canvas");
+    if (cv) R.peopleIcon(cv.getContext("2d"), 10, 11, 15);
   }
 
-  function onDesktopApp(id) {
-    if (id === "engine") { A.sfx.select(); startCode(); return; }
-    if (id === "shop") { A.sfx.ui(); openShop(); return; }
-    var win = { net: "<b>GameJamNet</b><br><i>“day one and someone already has a vertical slice??”</i><br>(do NOT read the comments.)", trash: "<b>Recycle Bin</b><br>0 items. You never delete anything." }[id] || "…";
-    var w = document.createElement("div"); w.className = "dk-window";
-    w.innerHTML = '<div class="dk-titlebar"><span>' + id + '.exe</span><button class="dk-x">×</button></div><div class="dk-body">' + win + '</div>';
-    els.overlay.querySelector(".desktop").appendChild(w);
-    w.querySelector(".dk-x").onclick = function () { w.remove(); };
+  // the always-running jam deadline shown on the desktop
+  function tickDeadline() {
+    var el = document.getElementById("dk-clockbig"); if (!el) return;
+    var left = Math.max(0, G.deadline | 0);
+    var mm = Math.floor(left / 60), ss = left % 60;
+    el.textContent = mm + ":" + ("0" + ss).slice(-2);
+    el.className = "dk-clockbig" + (left < 60 ? " urgent" : "");
   }
 
   // =========================================================
@@ -244,20 +251,24 @@
     G.state = "shop";
     var rows = global.JamData.SHOP.map(function (it, i) {
       var d = drinkById(it.id), afford = G.players >= it.price;
-      return '<div class="sh-row' + (afford ? "" : " broke") + '" data-i="' + i + '">' +
-        '<canvas class="sh-img" width="44" height="60"></canvas>' +
-        '<div class="sh-meta"><div class="sh-name">' + d.name + '</div><div class="sh-tag">' + it.tag + '</div></div>' +
-        '<div class="sh-buy"><span class="sh-price">' + it.price + '</span><span class="sh-cta">BUY</span></div></div>';
+      return '<div class="gf-row' + (afford ? "" : " broke") + '" data-i="' + i + '">' +
+        '<canvas class="gf-img" width="44" height="60"></canvas>' +
+        '<div class="gf-meta"><div class="gf-name">' + d.name + '</div>' +
+        '<div class="gf-tag">' + it.tag + '</div>' +
+        '<div class="gf-eta">15-20 min &middot; free delivery</div></div>' +
+        '<div class="gf-buy"><span class="gf-price">' + it.price + '</span><span class="gf-cta">ORDER</span></div></div>';
     }).join("");
-    overlay('<div class="shop">' +
-      '<div class="sh-bar"><span class="sh-logo">DrinkMart</span><span class="sh-cart" id="sh-players"></span></div>' +
-      '<div class="sh-list">' + rows + '</div>' +
-      '<button class="big-btn alt" id="sh-back">Back to desktop</button></div>');
+    overlay('<div class="ipad"><div class="ipad-cam"></div><div class="gf">' +
+      '<div class="gf-bar"><span class="gf-logo">Grub<span>Go</span></span>' +
+      '<span class="gf-wallet" id="sh-players"></span></div>' +
+      '<div class="gf-hero">Drinks &amp; snacks &mdash; delivered to your desk</div>' +
+      '<div class="gf-list">' + rows + '</div></div>' +
+      '<button class="ipad-home" id="sh-back"></button></div>');
     playersChip(document.getElementById("sh-players"));
-    var wrap = els.overlay.querySelector(".shop");
-    wrap.querySelectorAll(".sh-row").forEach(function (row, i) {
+    var wrap = els.overlay.querySelector(".gf");
+    wrap.querySelectorAll(".gf-row").forEach(function (row, i) {
       var it = global.JamData.SHOP[i], d = drinkById(it.id);
-      var cv = row.querySelector(".sh-img"); var c = cv.getContext("2d"); c.imageSmoothingEnabled = false;
+      var c = row.querySelector(".gf-img").getContext("2d"); c.imageSmoothingEnabled = false;
       R.drinkSprite(c, d, 22, 30, 56);
       row.onclick = function () { buyDrink(it); };
     });
@@ -295,7 +306,7 @@
     G.buffName = c.drink.name + " — " + c.item.tag;
     A.sfx.win(); G.shake = 7;
     pop(W / 2, H * 0.35, "AHHH!", "#7bd88a", 22);
-    setTimeout(function () { G.chug = null; openShop(); }, 900);
+    setTimeout(function () { G.chug = null; openDesktop(); }, 900);
   }
 
   function typeChar(ch) {
@@ -305,7 +316,7 @@
     var ok = (ch === exp) || (exp && exp.length === 1 && ch.toLowerCase() === exp.toLowerCase() && exp.toLowerCase() !== exp.toUpperCase());
     if (ok) {
       G.typedLen++; G.typing = true; G.handTap = 0.12; A.sfx.tick();
-      if (G.typedLen >= G.target.length) startShip();
+      if (G.typedLen >= G.target.length) nextLine();
     } else {
       G.mistakes++; G.mistakeFlash = 0.5; G.shake = Math.max(G.shake, 4); A.sfx.error();
     }
@@ -423,6 +434,11 @@
     if (G.state !== "title" && G.state !== "boot") {
       G.players += perSecNow() * dt;
       if (G.state === "itch") { var el = document.getElementById("itch-count"); if (el) el.textContent = fmt(G.players); renderAfford(); }
+    }
+    // jam deadline always ticking (except on the title)
+    if (G.state !== "title" && G.state !== "boot") {
+      G.deadline = Math.max(0, G.deadline - dt * (G.buff.clockSlow || 1));
+      if (G.state === "desktop") tickDeadline();
     }
     // room walking
     if (G.state === "room") updateRoom(dt);
